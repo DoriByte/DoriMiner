@@ -1,0 +1,25 @@
+DoriMiner - additional permission from the licensor
+
+The source code of DoriMiner is licensed under the PolyForm Noncommercial License 1.0.0 (see LICENSE).
+On top of what that licence allows, J. Costa (DoriByte), the licensor, grants everyone the following.
+
+1. Mining for yourself is a permitted purpose.
+   Running DoriMiner, as published by DoriByte or as built by you from this source, to mine for your own
+   account or for the account of the company you work for, on hardware you own or rent, at any scale and for
+   profit, is a permitted purpose under the licence.
+
+2. What stays outside the permitted purposes. You may not, without a written agreement with DoriByte:
+   a. sell, rent or sublicense the software, or offer it as part of a paid product or paid service;
+   b. use any part of it in another miner or in any other software that is sold, that charges a fee, or
+      whose source is not available on these same terms;
+   c. distribute a version that mines, at any time, for anyone other than the person running it and
+      DoriByte, or that hides from the person running it for whom it is mining.
+
+3. Turning the dev fee off with the documented option (--dev-fee 0) is allowed and always will be.
+
+4. The kernel images (crates/qtc-cuda/kernels/sealed and the copies inside the executables) are not source
+   code and are not covered by the PolyForm licence: their terms are in KERNEL-LICENSE.
+
+If you want to do something these terms do not allow, talk to us. We would rather agree than refuse.
+
+Contact: https://github.com/DoriByte  -  Discord: https://discord.gg/QBzHYGadE

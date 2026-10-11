@@ -1,0 +1,14 @@
+DoriMiner
+Copyright (C) 2026 J. Costa (DoriByte)
+
+Parts of this program derive from the Quantus external miner:
+
+  https://github.com/Quantus-Network/quantus-miner
+  commit c7838cbc86f7d74477da1771139f377a8e438072 (2026-09-18)
+  Copyright Quantus Network
+  Licensed under the Apache License, Version 2.0 (licenses/Apache-2.0.txt in the
+  package, third_party/quantus-miner/LICENSE in the source tree);
+  its pow-core crate is dual licensed MIT OR Apache-2.0.
+
+The mining kernel, the search engine on the card and the exact hash on the CPU started from that code and
+were changed by DoriByte.

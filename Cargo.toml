@@ -1,0 +1,25 @@
+[workspace]
+members = ["crates/qtc-cuda", "crates/doriworker", "crates/qtc-pow"]
+default-members = ["crates/doriworker"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.4"
+publish = false
+license = "PolyForm-Noncommercial-1.0.0"
+
+[workspace.dependencies]
+hex = "0.4.3"
+log = "0.4.22"
+primitive-types = { version = "0.13.1", default-features = false, features = ["std"] }
+qp-poseidon-core = { version = "3.1.0", default-features = false }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = false
+
+[profile.dev]
+opt-level = 1

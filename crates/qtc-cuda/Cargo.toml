@@ -1,0 +1,28 @@
+[package]
+name = "qtc-cuda"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+# The host code of this crate: PolyForm Noncommercial with MINING-PERMISSION. The kernel images it embeds: KERNEL-LICENSE.
+license = "PolyForm-Noncommercial-1.0.0 AND LicenseRef-DoriMiner-Kernel"
+description = "CUDA QPoW search engine: embedded kernel images for each GPU architecture, candidates verified on the CPU"
+build = "build.rs"
+
+[dependencies]
+cudarc = { version = "0.19.9", default-features = false, features = [
+	"cuda-12040",
+	"driver",
+	"dynamic-loading",
+	"fallback-dynamic-loading",
+	"nvrtc",
+	"std",
+] }
+log = { workspace = true }
+primitive-types = { workspace = true }
+qtc-pow = { path = "../qtc-pow" }
+
+[build-dependencies]
+cc = "1"
+
+[dev-dependencies]
+hex = { workspace = true }

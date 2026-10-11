@@ -1,0 +1,14 @@
+[package]
+name = "qtc-pow"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Quantus QPoW reference hash and the host-side sponge precomputation used by the GPU kernel"
+
+[dependencies]
+primitive-types = { workspace = true }
+qp-poseidon-core = { workspace = true }
+
+[dev-dependencies]
+hex = { workspace = true }
