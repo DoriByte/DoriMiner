@@ -410,7 +410,9 @@ fn decode(
         }
         match job.verify_at(walk, launch, per_thread, index) {
             Some(hit) => outcome.hits.push(hit),
-            None => outcome.false_candidates += 1,
+            None => {
+                outcome.false_candidates += 1;
+            }
         }
     }
     Ok(outcome)

@@ -2,8 +2,8 @@
 
 An NVIDIA miner for Quantus (QTC, the QPoW algorithm: Poseidon2 over Goldilocks), by DoriByte.
 
-**Status: test release for the RTX 50 series.** Measured on one card so far, an RTX 5070 Ti. It runs on older
-NVIDIA cards too, but the fast kernel is only in for the 50 series.
+**Status: test release for the RTX 30, 40 and 50 series.** Measured on four cards so far: an RTX 5070 Ti, an
+RTX 3060 Ti, an RTX 3090 and an RTX 4090. It runs on the RTX 20 and GTX 16 series too, with a slower kernel.
 
 ## Where we stand
 
@@ -91,7 +91,7 @@ cargo test --workspace        # CPU only; never touches a GPU
 
 ## Tell us what your card does
 
-We have measured one card. Yours is worth a lot to us:
+We have measured four cards. Yours is worth a lot to us:
 
 - the card (model and maker) and the driver version
 - the last lines of `dori-miner bench --duration 60`
