@@ -5,7 +5,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.1.5"
+version = "0.1.6"
 publish = false
 license = "PolyForm-Noncommercial-1.0.0"
 

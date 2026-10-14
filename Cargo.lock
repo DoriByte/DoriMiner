@@ -322,7 +322,7 @@ dependencies = [
 
 [[package]]
 name = "doriworker"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "clap",
  "ctrlc",
@@ -685,7 +685,7 @@ checksum = "5872607e25ea4ee5fb37e64bf1462168e1a36a4e719cdc8a105533c708253918"
 
 [[package]]
 name = "qtc-cuda"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "cudarc",
  "hex",
@@ -696,7 +696,7 @@ dependencies = [
 
 [[package]]
 name = "qtc-pow"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "hex",
  "primitive-types",
