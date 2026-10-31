@@ -1,0 +1,16 @@
+[package]
+name = "prl-pow"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Pearl (PRL) proof of work on the host: the exact CPU twin of a mining attempt, the job and pair sides a GPU search needs, and shares built and checked with the official proof and verifier"
+
+[dependencies]
+base64 = "0.21"
+bincode = "1.3.3"
+blake3 = "1.8"
+# The official proof and its verifier (pearl-research-labs/pearl, ISC), at commit 2f8b770, the one the twin was
+# checked against: every share is checked by them before it leaves the miner (third_party/pearl/README.md).
+pearl-blake3 = { path = "../../third_party/pearl/pearl-blake3" }
+zk-pow = { path = "../../third_party/pearl/zk-pow" }

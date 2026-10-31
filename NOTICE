@@ -12,3 +12,14 @@ Parts of this program derive from the Quantus external miner:
 
 The mining kernel, the search engine on the card and the exact hash on the CPU started from that code and
 were changed by DoriByte.
+
+NVIDIA's static CUDA runtime (libcudart_static.a, cudart_static.lib) is linked into the miner for the Ergo and Vela
+engines and carried in the source tree beside them, as the CUDA Toolkit's end user licence allows.
+Copyright NVIDIA Corporation. It is not covered by this program's licence.
+
+Pearl's official proof and verifier are linked into the miner, unchanged, from
+  https://github.com/pearl-research-labs/pearl
+  commit 2f8b770cac8f8b74be05c1fc51c2baeb76ce0701
+  zk-pow and pearl-blake3: ISC License, Copyright (c) 2025-2026 Pearl Research Labs, Copyright (c) 2015-2016
+  The Decred developers (licenses/pearl-ISC.txt in the package, third_party/pearl/LICENSE in the source tree);
+  plonky2 (Pearl's copy): MIT or Apache-2.0 (licenses/plonky2-MIT.txt, licenses/plonky2-Apache-2.0.txt).

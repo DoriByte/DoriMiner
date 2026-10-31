@@ -1,0 +1,16 @@
+[package]
+name = "erg-cuda"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+# The host code of this crate: PolyForm Noncommercial with MINING-PERMISSION. The engine it builds: KERNEL-LICENSE.
+license = "PolyForm-Noncommercial-1.0.0 AND LicenseRef-DoriMiner-Kernel"
+description = "CUDA Ergo (ERG) Autolykos v2 search on RTX 50, 40, 30 and 20 cards, through the sealed engine"
+build = "build.rs"
+links = "erg"
+
+[dependencies]
+primitive-types = { workspace = true }
+
+[build-dependencies]
+sha2 = "0.10"

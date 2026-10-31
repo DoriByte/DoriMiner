@@ -2,9 +2,11 @@ DoriMiner - licence of the kernel images
 
 Copyright (C) 2026 J. Costa (DoriByte). All rights reserved.
 
-"The kernel images" are the compiled GPU programs that DoriMiner loads onto a graphics card: the files in
-crates/qtc-cuda/kernels/sealed, and the copies of them inside any DoriMiner executable. They are published
-in compiled, sealed form only. Their source code is not published.
+"The kernel images" are the compiled GPU programs that DoriMiner loads onto a graphics card, for every coin, and
+the compiled engines that hold them: the files in the crates/*/kernels/sealed folders (Quantus, Pearl, Ergo, Vela and
+any coin added later), and the copies of them inside any DoriMiner executable. NVIDIA's CUDA runtime, carried beside
+the engines, is NVIDIA's and is not covered here. They are published in compiled, sealed form only. Their source code
+is not published.
 
 1. What you may do, free of charge:
    a. use the kernel images, through DoriMiner, to mine for your own account or for the account of the
@@ -21,8 +23,8 @@ in compiled, sealed form only. Their source code is not published.
    c. modify them, or distribute modified copies;
    d. sell, rent or sublicense them, or offer them as part of a paid product or paid service.
 
-3. The sealing of the images is a technical measure that protects them. That its key can be read in the
-   published source does not give permission to do what clause 2 forbids.
+3. The sealing of the images is a technical measure that protects them. That it can be opened does not give
+   permission to do what clause 2 forbids.
 
 4. Nothing here takes away a right the law gives you and does not allow a licence to remove (in the European
    Union, for instance, the limited rights of a lawful user under Directive 2009/24/EC). Those rights apply
@@ -36,4 +38,4 @@ in compiled, sealed form only. Their source code is not published.
 
 If you want to understand the kernel, you do not need to take it apart: talk to us.
 
-Contact: https://github.com/DoriByte  -  Discord: https://discord.gg/QBzHYGadE
+Contact: https://github.com/DoriByte  -  Discord: https://discord.gg/pEpuWh7D89

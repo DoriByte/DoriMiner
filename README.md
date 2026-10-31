@@ -1,37 +1,52 @@
 # DoriMiner
 
-An NVIDIA miner for Quantus (QTC, the QPoW algorithm: Poseidon2 over Goldilocks), by DoriByte.
+An NVIDIA miner for Quantus (QTC, the QPoW algorithm: Poseidon2 over Goldilocks), Pearl (PRL, RTX 50, 40 and 30 cards) and
+Ergo (ERG, Autolykos v2),
+Vela (VELA, Proof-of-Inference, RTX 50, 40 and 30 cards),
+by DoriByte.
 
-**Status: test release for the RTX 30, 40 and 50 series.** Measured on four cards so far: an RTX 5070 Ti, an
-RTX 3060 Ti, an RTX 3090 and an RTX 4090. It runs on the RTX 20 and GTX 16 series too, with a slower kernel.
+**Status: test release for the RTX 30, 40 and 50 series.** Measured on a few cards so far: an RTX 5070 Ti, an
+RTX 5080, an RTX 4090, an RTX 3090, an RTX 3070, an RTX 3060 Ti and an RTX 2070 Super. It also runs on the other
+RTX 20 cards, with a slower kernel.
 
 ## Where we stand
 
 **Transparency and trust.** The miner is free, and its source is here for anyone to read and build: the pool
 client, what is sent to the pool and when, the dev fee and the wallet it goes to, the local API, the exact
-hash on the CPU, and the code that drives the card. Please audit it. If you find something wrong, tell us.
+hash on the CPU and every check of a share against it, and the coin's protocol. Please audit it. If you find something wrong, tell us.
 
-**The kernel is closed, for now.** The program that runs on the GPU is in this repository as compiled, sealed
-images, not as source. It is where the speed comes from, and we would rather not hand it to closed, paid
-miners. This is a position for the present, not a principle.
+**The kernels and the code that drives them are closed, for now.** The programs that run on the GPU, and on all four coins
+the host code that prepares and launches them, are in this repository as sealed static libraries, one per system
+(`crates/*/kernels/sealed`), not as source. That is where the speed comes from, and we would rather not hand it to closed,
+paid miners. This is a position for the present, not a principle. In plain terms: the miner is open, the kernel and how it
+works are not.
 
-**We are not hiding it from you.** The sealing only keeps the kernel from falling out of the executable with
-a one-line command. It is not strong protection and we do not pretend it is: the code that unseals the images
-is in this repository (`crates/qtc-cuda/src/seal.rs`), because the miner has to do it to run them. What asks
-you not to open them outside the running miner is the kernel's licence (`KERNEL-LICENSE`), not the seal. If you want to understand the kernel, you do not need to take it apart:
-talk to us ([Discord](https://discord.gg/QBzHYGadE)). We want to contribute to a better mining community for everyone, and we answer.
+**What a closed engine can and cannot do.** An engine is ordinary native code inside the miner's process. It loads the NVIDIA
+driver, starts threads, allocates memory and talks to the card. It gets a job's data and gives back candidates; it is never
+given your wallet, your pool, the fee or a socket, and it has no network code (you can check its imports with `dumpbin` or
+`nm`, though imports alone cannot prove what native code does: it can load libraries by name, as it does for the driver). What you
+can audit without it is what matters for your money: the wallet and the fee (`crates/dori-miner/src/devfee.rs`), what is sent to
+the pool and when (`pool.rs`, `prl_pool.rs`, `erg_pool.rs`), and that nothing is submitted that the open CPU code has not checked.
+
+**We are not hiding that it is closed.** The sealing only keeps the kernels from falling out of the executable with
+a one-line command. It is not strong protection and we do not pretend it is: the miner has to open them to run them, and a
+determined reader can take native code apart. What asks you not to do that is the kernel's licence (`KERNEL-LICENSE`), not the seal. If you want to understand the kernel, you do not need to take it apart:
+talk to us ([Discord](https://discord.gg/pEpuWh7D89)). We want to contribute to a better mining community for everyone, and we answer.
 
 **You can check what the kernel does without its source.** `dori-miner bench` starts by hashing 4096 nonces on
 the card and running a search on it, and compares both with the exact hash computed on the CPU by the code in
 `crates/qtc-pow`; while mining, every share is checked on the CPU before it is sent, and `--self-check` measures the card against the CPU for as
-long as you like. A kernel can only produce hashes: it has no network, no files, no wallet.
+long as you like. On Pearl every tile the card reports is checked twice on the CPU before it is sent: by the miner's
+own exact model of the proof of work (`crates/prl-pow`), then with the official proof and verifier of
+[pearl-research-labs/pearl](https://github.com/pearl-research-labs/pearl), against the pool's target. A share that does
+not pass these open checks does not leave the miner, whatever the engine says.
 
 ## Dev fee
 
-Optional, and 1% unless you say otherwise: just under one minute in every hundred is mined for the DoriByte wallet, on
-the pool you chose. It is never more than 1% of a run: the first minute comes after 99 minutes of mining for
+Optional, and 1% unless you say otherwise: just under one minute in every hundred is mined for the DoriByte wallet of
+the coin you mine, on the pool you chose. It is never more than 1% of a run: the first minute comes after 99 minutes of mining for
 you, a shorter run pays nothing, and your pool password is not sent on the fee's link. `--dev-fee 0` turns
-it off. All of it is in `crates/doriworker/src/devfee.rs`, wallet included; the log says at the start what the fee is, and
+it off. All of it is in `crates/dori-miner/src/devfee.rs`, wallet included; the log says at the start what the fee is, and
 when a window starts and ends, and `/summary` counts its shares apart from yours.
 
 ## Use
@@ -53,7 +68,46 @@ dori-miner -o stratum+ssl://qtc-eu.kryptex.network:8049 -u <wallet> -w <worker> 
 | `--self-check <bits>` | Measure the card against the CPU while mining |
 | `--dev-fee <percent>` | Dev fee, 0 to 5. **1 when not given; `--dev-fee 0` turns it off** |
 
-`dori-miner --help` lists the other options. 
+`dori-miner --help` lists the other options.
+
+### Pearl
+
+```
+dori-miner --coin pearl -o stratum+ssl://prl.kryptex.network:8048 -u <wallet> -w <worker> --api-port 4068
+```
+
+- RTX 50, 40 and 30 cards (compute capability 12.0, 8.9 and 8.6). Other cards are refused with a message.
+- Pearl addresses start with "prl1". The hash rate is in products a second (TH/s), as Pearl miners give it.
+- Two machines on the same wallet do not repeat each other's work.
+- Pools: mined on Kryptex (`stratum+ssl://prl.kryptex.network:8048` and its regions, `-u WALLET -w WORKER`), shares
+  accepted. Other Pearl pools are not tried yet; tell us how it goes.
+
+### Ergo
+
+```
+dori-miner --coin ergo -o stratum+ssl://erg-eu.kryptex.network:8021 -u <wallet> -w <worker> --api-port 4068
+```
+
+- Ergo addresses start with "9". Each card is checked against the CPU before it mines and at every new height.
+- When the table grows past a card's memory, the card keeps mining, more slowly, and the miner tells you. Today it still fits on 8 GB cards, so this has not yet run for real: tell us how it goes.
+- `--lithos` connects to a local Lithos client (no dev fee on a local pool).
+
+### Vela
+
+```
+dori-miner --coin vela -o stratum+ssl://vela.suprnova.cc:7604 -u <wallet>.<worker> --api-port 4068
+```
+
+- RTX 50, 40 and 30 cards (12.0, 8.9 and 8.6), NVIDIA driver 580 or newer (CUDA 13).
+- Proof-of-Inference: each attempt is one step of the sd-turbo integer UNet, exact to the official `sdint.py`, and the
+  hash of its output is the share. The rate is in inferences a second (inf/s).
+- The model (`sd-turbo-int.poisd`, about 1.2 GB) is downloaded on the first start from the pool's server (then its
+  mirror), checked by its SHA-256 and kept in the data folder (`$DORI_DATA_DIR`, else `~/.local/share/dori-miner` or
+  `%LOCALAPPDATA%\DoriMiner`); `--vela-model <file>` uses another copy. `GET /summary` shows the download as `model`.
+  The model is Stability AI's sd-turbo, under the Stability AI Community License: it is not in this tree.
+- Each card is checked against the official test vector before it mines; every attempt is hashed on the CPU.
+- Pools: Suprnova (`vela.suprnova.cc`, `stratum-eu2`, `stratum-ord`, `stratum-hkg.suprnova.cc`, TLS port 7604,
+  `-u WALLET.WORKER`), shares accepted on `vela.suprnova.cc`.
 
 ### Pools
 
@@ -75,44 +129,51 @@ something between you and the pool is answering in its place. `--tls-fingerprint
 On any other pool it prints the certificate's fingerprint for you to pin.
 
 The miner does not touch your card's settings: no overclock, no power limit, no fan control. For that we
-recommend [DoriRig](https://github.com/DoriByte/dori-rig-releases/releases) (beta), DoriByte's own rig manager, which runs DoriMiner and takes care
+recommend [DoriRig](https://gitlab.com/doribyte-releases/downloads) (beta), DoriByte's own rig manager, which runs DoriMiner and takes care
 of fans, limits and temperatures; any tool you already use works too. Either way, watch the temperatures (memory too) on the
 first run.
 
 ## Build
 
-Rust is all you need: the kernel images are in the tree, so there is no CUDA Toolkit to install. At run time
-the miner needs only the NVIDIA driver.
+Rust and its system linker are all you need (on Linux, libstdc++ for the Ergo and Vela engines): the engines are in the tree as
+static libraries, so there is no CUDA Toolkit to install. At run time the miner needs only the NVIDIA driver.
 
 ```
-cargo build --release         # gives target/release/doriworker(.exe): the release package calls it dori-miner
+cargo build --release         # gives target/release/dori-miner(.exe): the release package calls it dori-miner
 cargo test --workspace        # CPU only; never touches a GPU
 ```
 
 ## Tell us what your card does
 
-We have measured four cards. Yours is worth a lot to us:
+We have measured only a few cards. Yours is worth a lot to us:
 
 - the card (model and maker) and the driver version
 - the last lines of `dori-miner bench --duration 60`
 - your settings (stock, or core clock / offset / power limit) and the watts you read
 - if you can, the hash rate of the miner you use today at the same settings
 
-Post it in the #hashrates channel of our Discord: https://discord.gg/QBzHYGadE
+Post it in the #hashrates channel of our Discord: https://discord.gg/pEpuWh7D89
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `crates/qtc-pow` | Exact QPoW hash on the CPU, and the sponge states the kernel resumes from |
-| `crates/qtc-cuda` | Loading the kernel and the search engine on each card; `kernels/sealed` holds the images |
-| `crates/doriworker` | The program: pool client, GPU workers, dev fee, local API, benchmark |
+| `crates/qtc-pow` | Exact QPoW hash on the CPU |
+| `crates/qtc-cuda` | Quantus on each card: the engine as a sealed library (`kernels/sealed`), candidates checked on the CPU |
+| `crates/prl-pow` | Pearl on the CPU: the exact model of the proof of work, the job and pair sides, shares checked with the official verifier |
+| `crates/prl-cuda` | Pearl on each card: the engine as a sealed library (`kernels/sealed`) |
+| `crates/erg-cuda` | Ergo on each card: the engine as a sealed library (`kernels/sealed`, with NVIDIA's static CUDA runtime), and the protocol's hashes |
+| `crates/vela-cuda` | Vela on each card: the engine as a sealed library (`kernels/sealed`, with NVIDIA's static CUDA runtime), and the protocol's hashes |
+| `crates/dori-miner` | The program: pool clients, GPU workers, dev fee, local API, benchmark |
+| `third_party/pearl` | Pearl's official proof and verifier (`zk-pow`, `pearl-blake3`, `plonky2`), unchanged, with their licences |
 
 ## Credits and licence
 
 Parts of the host code, and the kernel the closed one started from, derive from
 [Quantus-Network/quantus-miner](https://github.com/Quantus-Network/quantus-miner) (Apache-2.0); see
-[NOTICE](NOTICE). 
+[NOTICE](NOTICE). Pearl's official proof and verifier are in `third_party/pearl`, unchanged, under their own
+licences (ISC; plonky2 MIT or Apache-2.0). `crates/vela-cuda/kernels/sealed` and `crates/erg-cuda/kernels/sealed` carry NVIDIA's static CUDA runtime
+(`libcudart_static.a`), redistributed under the NVIDIA CUDA Toolkit licence.
 
 In short, and the files are what counts:
 
@@ -121,6 +182,6 @@ In short, and the files are what counts:
   for your own account, at any scale and for profit, is allowed.
 - **Not for sale.** You may not sell it, put it in a paid product or service, or use its code in another
   miner that charges a fee or keeps its source closed.
-- **The kernel images** are free to use with DoriMiner and may not be taken apart: [KERNEL-LICENSE](KERNEL-LICENSE).
+- **The kernel images and the sealed engines** are free to use with DoriMiner and may not be taken apart: [KERNEL-LICENSE](KERNEL-LICENSE).
 
 Want something these terms do not allow? Talk to us.

@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 license.workspace = true
-description = "Quantus QPoW reference hash and the host-side sponge precomputation used by the GPU kernel"
+description = "Quantus QPoW reference hash on the CPU"
 
 [dependencies]
 primitive-types = { workspace = true }

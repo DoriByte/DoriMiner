@@ -17,9 +17,9 @@ On top of what that licence allows, J. Costa (DoriByte), the licensor, grants ev
 
 3. Turning the dev fee off with the documented option (--dev-fee 0) is allowed and always will be.
 
-4. The kernel images (crates/qtc-cuda/kernels/sealed and the copies inside the executables) are not source
+4. The kernel images (the crates/*/kernels/sealed folders, for every coin, and the copies inside the executables) are not source
    code and are not covered by the PolyForm licence: their terms are in KERNEL-LICENSE.
 
 If you want to do something these terms do not allow, talk to us. We would rather agree than refuse.
 
-Contact: https://github.com/DoriByte  -  Discord: https://discord.gg/QBzHYGadE
+Contact: https://github.com/DoriByte  -  Discord: https://discord.gg/pEpuWh7D89
