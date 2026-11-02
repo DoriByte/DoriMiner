@@ -1,8 +1,3 @@
-//! The public tree's build of vela-cuda: the Vela engine is not source here but a sealed library, one per system
-//! (kernels/sealed/linux: libvela.a and the static CUDA runtime it links; kernels/sealed/windows: vela.lib and
-//! cudart_static.lib), checked against its SHA-256 table. No CUDA Toolkit is needed; the cards need NVIDIA driver 580
-//! or newer.
-
 use std::path::PathBuf;
 
 fn main() {

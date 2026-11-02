@@ -1,6 +1,3 @@
-//! Published without its comments: they describe the kernel, which is closed for now (see the README).
-//! The code is all here.
-
 
 use primitive_types::U512;
 use qp_poseidon_core::{Goldilocks, Poseidon2};

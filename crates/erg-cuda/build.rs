@@ -1,8 +1,3 @@
-//! The public tree's build of erg-cuda: the ERG engine is not source here but a sealed library, one per system
-//! (kernels/sealed/linux: liberg.a and the static CUDA runtime it links; kernels/sealed/windows: erg.lib and
-//! cudart_static.lib), checked against its SHA-256 table. No CUDA Toolkit is needed; the cards need NVIDIA driver 580
-//! or newer.
-
 use std::path::PathBuf;
 
 fn main() {

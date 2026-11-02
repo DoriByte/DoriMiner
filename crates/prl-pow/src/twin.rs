@@ -1,25 +1,6 @@
-//! Gémeo exato, em CPU, de uma tentativa de mineração de Pearl (conta de inteiros, certificados V2 e V3).
-//!
-//! Escrito de raiz. Conferido contra o verificador oficial (`pearl-research-labs/pearl`, crate `zk-pow`)
-//! com vetores gerados a chamar as funções oficiais.
-//!
-//! Etapas, pela ordem em que acontecem:
-//!   1. `chave_do_trabalho`  = BLAKE3(cabeçalho de 76 bytes || configuração de 52 bytes)
-//!   2. `raiz`               = BLAKE3 com chave (a do trabalho) sobre a matriz, cheia de zeros até um múltiplo de 1024
-//!   3. V3: cada raiz é salgada com a dimensão (m para A, n para B)
-//!   4. sementes: B = BLAKE3(chave || raiz_B); A = BLAKE3(semente_B || raiz_A)
-//!   5. ruído de característica r: (matriz uniforme m×r) × (matriz k×r com um +1 e um −1 por linha)
-//!   6. por tile: soma de produtos em troços de r; no fim de cada troço, XOR de todos os acumuladores
-//!      misturado num transcrito de 16 palavras (rotação de 13)
-//!   7. BLAKE3 com chave (a semente de A) sobre as 16 palavras; inteiro de 256 bits, little-endian, <= alvo × fator
-
 pub const PALAVRAS_TRANSCRITO: usize = 16;
 pub const ROTACAO: u32 = 13;
 pub const RANK_BASE_PENALIZACAO: usize = 128;
-
-// ---------------------------------------------------------------------------------------------
-// Inteiro de 256 bits sem sinal, o mínimo necessário (quatro palavras de 64 bits, a baixa primeiro).
-// ---------------------------------------------------------------------------------------------
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct U256(pub [u64; 4]);
@@ -44,7 +25,6 @@ impl U256 {
         b
     }
 
-    /// Desloca à esquerda; os bits que saem por cima perdem-se.
     pub fn desloca_esq(&self, bits: u32) -> U256 {
         if bits >= 256 {
             return U256::ZERO;
@@ -62,7 +42,6 @@ impl U256 {
         U256(w)
     }
 
-    /// Multiplica por um fator de 64 bits; `None` se o resultado não couber em 256 bits.
     pub fn vezes(&self, fator: u64) -> Option<U256> {
         let mut w = [0u64; 4];
         let mut transporte: u128 = 0;
@@ -88,8 +67,6 @@ impl U256 {
     }
 }
 
-/// Alvo compacto ao estilo Bitcoin: mantissa de 3 bytes vezes 256^(expoente − 3).
-/// Mantissa nula, expoente nulo ou bit de sinal (0x00800000) dão zero.
 pub fn alvo_de_nbits(nbits: u32) -> U256 {
     let expoente = nbits >> 24;
     let mantissa = nbits & 0x00ff_ffff;
@@ -103,10 +80,6 @@ pub fn alvo_de_nbits(nbits: u32) -> U256 {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Cabeçalho, padrões e configuração
-// ---------------------------------------------------------------------------------------------
-
 #[derive(Clone, Copy, Debug)]
 pub struct Cabecalho {
     pub versao: u32,
@@ -117,7 +90,7 @@ pub struct Cabecalho {
 }
 
 impl Cabecalho {
-    /// 76 bytes: campos em little-endian e os dois hashes com os bytes invertidos.
+
     pub fn bytes(&self) -> [u8; 76] {
         let mut b = [0u8; 76];
         b[0..4].copy_from_slice(&self.versao.to_le_bytes());
@@ -131,16 +104,13 @@ impl Cabecalho {
     }
 }
 
-/// Padrão periódico de índices: soma direta de até três progressões (passo, comprimento),
-/// da mais fina para a mais larga. Ex.: {0, 8, 64, 72} = (8, 2) + (64, 2).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Padrao {
     pub dims: Vec<(u32, u32)>,
 }
 
 impl Padrao {
-    /// Decompõe uma lista crescente que começa em 0. Em cada nível toma a corrida mais longa
-    /// de múltiplos do primeiro passo (a forma canónica: um passo não se parte em dois níveis).
+
     pub fn de_lista(lista: &[u32]) -> Result<Padrao, String> {
         if lista.is_empty() || lista[0] != 0 {
             return Err("o padrão tem de começar em 0".into());
@@ -176,7 +146,6 @@ impl Padrao {
         Ok(p)
     }
 
-    /// Os índices do padrão, por ordem crescente.
     pub fn indices(&self) -> Vec<u32> {
         let mut v = vec![0u32];
         for &(passo, comprimento) in &self.dims {
@@ -197,13 +166,10 @@ impl Padrao {
         self.dims.last().map_or(1, |d| d.0 * d.1)
     }
 
-    /// Uma base é válida se, em cada nível, cair na primeira fatia do período desse nível.
-    /// As bases válidas de um período, com o padrão somado, cobrem o período sem sobreposição.
     pub fn base_valida(&self, base: u32) -> bool {
         self.dims.iter().all(|&(passo, comprimento)| base % (passo * comprimento) < passo)
     }
 
-    /// 6 bytes: por nível, (passo / período do nível anterior − 1, comprimento − 1); níveis em falta a zero.
     pub fn bytes(&self) -> [u8; 6] {
         let mut b = [0u8; 6];
         let mut anterior = 1u32;
@@ -225,7 +191,7 @@ pub struct Configuracao {
 }
 
 impl Configuracao {
-    /// 52 bytes: k (4), rank (2), tipo de conta (2, sempre 0), os dois padrões (6 + 6), 32 a zero (sem MoE).
+
     pub fn bytes(&self) -> [u8; 52] {
         let mut b = [0u8; 52];
         b[0..4].copy_from_slice(&self.k.to_le_bytes());
@@ -235,7 +201,6 @@ impl Configuracao {
         b
     }
 
-    /// Comprimento do produto interno que conta: k arredondado para baixo a um múltiplo de r.
     pub fn comprimento_util(&self) -> usize {
         let (k, r) = (self.k as usize, self.rank as usize);
         k - k % r
@@ -248,23 +213,19 @@ impl Configuracao {
         self.colunas.tamanho()
     }
 
-    /// Fator pelo qual o alvo é multiplicado: acumuladores do tile × comprimento do produto.
     pub fn fator(&self) -> u64 {
         (self.h() * self.w() * self.comprimento_util()) as u64
     }
 
-    /// Com a regra de penalização: acumuladores × número de troços × 128.
     pub fn fator_penalizado(&self) -> u64 {
         (self.h() * self.w() * (self.comprimento_util() / self.rank as usize) * RANK_BASE_PENALIZACAO) as u64
     }
 }
 
-/// Limite do hash sem penalização; satura no máximo quando não cabe.
 pub fn limite(nbits: u32, c: &Configuracao) -> U256 {
     alvo_de_nbits(nbits).vezes(c.fator()).unwrap_or(U256::MAX)
 }
 
-/// Limite com penalização de rank; `None` quando não cabe em 256 bits ou o fator é nulo.
 pub fn limite_penalizado(nbits: u32, c: &Configuracao) -> Option<U256> {
     let f = c.fator_penalizado();
     if f == 0 {
@@ -273,10 +234,6 @@ pub fn limite_penalizado(nbits: u32, c: &Configuracao) -> Option<U256> {
     alvo_de_nbits(nbits).vezes(f)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Compromissos e sementes
-// ---------------------------------------------------------------------------------------------
-
 pub fn chave_do_trabalho(cab: &Cabecalho, cfg: &Configuracao) -> [u8; 32] {
     let mut d = Vec::with_capacity(128);
     d.extend_from_slice(&cab.bytes());
@@ -284,12 +241,10 @@ pub fn chave_do_trabalho(cab: &Cabecalho, cfg: &Configuracao) -> [u8; 32] {
     *blake3::hash(&d).as_bytes()
 }
 
-/// Raiz do compromisso de uma matriz dada por linhas (para B: as colunas de B como linhas).
-/// A árvore de Merkle é a própria árvore do BLAKE3 com chave, sobre os bytes cheios de zeros até 1024.
 pub fn raiz(matriz: &[i8], chave: &[u8; 32]) -> [u8; 32] {
     let cheio = (matriz.len() + 1023) / 1024 * 1024;
     let mut h = blake3::Hasher::new_keyed(chave);
-    // i8 e u8 têm a mesma representação.
+
     let bytes: &[u8] = unsafe { std::slice::from_raw_parts(matriz.as_ptr() as *const u8, matriz.len()) };
     h.update(bytes);
     if cheio > matriz.len() {
@@ -301,7 +256,6 @@ pub fn raiz(matriz: &[i8], chave: &[u8; 32]) -> [u8; 32] {
 const CONTEXTO_SAL_A: &[u8] = b"pearl/cert-v3/noise-seed/A";
 const CONTEXTO_SAL_B: &[u8] = b"pearl/cert-v3/noise-seed/B";
 
-/// V3: BLAKE3 com chave (o sal) sobre um bloco de 64 bytes: raiz, dimensão em 4 bytes, zeros.
 pub fn raiz_salgada(raiz: &[u8; 32], dimensao: u32, lado_a: bool) -> [u8; 32] {
     let sal = *blake3::hash(if lado_a { CONTEXTO_SAL_A } else { CONTEXTO_SAL_B }).as_bytes();
     let mut msg = [0u8; 64];
@@ -310,7 +264,6 @@ pub fn raiz_salgada(raiz: &[u8; 32], dimensao: u32, lado_a: bool) -> [u8; 32] {
     *blake3::keyed_hash(&sal, &msg).as_bytes()
 }
 
-/// (semente do ruído de B, semente do ruído de A). `v3` escolhe as raízes salgadas.
 pub fn sementes(chave: &[u8; 32], raiz_a: &[u8; 32], raiz_b: &[u8; 32], m: u32, n: u32, v3: bool) -> ([u8; 32], [u8; 32]) {
     let (ra, rb) = if v3 {
         (raiz_salgada(raiz_a, m, true), raiz_salgada(raiz_b, n, false))
@@ -327,12 +280,6 @@ pub fn sementes(chave: &[u8; 32], raiz_a: &[u8; 32], raiz_b: &[u8; 32], m: u32, 
     (semente_b, semente_a)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Ruído
-// ---------------------------------------------------------------------------------------------
-
-/// Um bloco de 32 bytes pseudoaleatórios: BLAKE3 com chave (a semente) sobre 64 bytes em que o
-/// contador (índice + 1) ocupa a palavra `posicao` e a etiqueta do lado ocupa os bytes 32 a 39.
 fn bloco_aleatorio(indice: usize, etiqueta: &[u8; 8], semente: &[u8; 32], posicao: usize) -> [u8; 32] {
     let mut msg = [0u8; 64];
     msg[posicao * 4..posicao * 4 + 4].copy_from_slice(&((indice + 1) as i32).to_le_bytes());
@@ -340,7 +287,6 @@ fn bloco_aleatorio(indice: usize, etiqueta: &[u8; 8], semente: &[u8; 32], posica
     *blake3::keyed_hash(semente, &msg).as_bytes()
 }
 
-/// Uma linha da matriz uniforme (r valores entre −32 e 31): 6 bits de cada byte, menos 32.
 pub fn linha_uniforme(linha: usize, r: usize, etiqueta: &[u8; 8], semente: &[u8; 32], blocos: &mut u64) -> Vec<i8> {
     let inicio = linha * r;
     let mut v = Vec::with_capacity(r);
@@ -359,7 +305,6 @@ pub fn linha_uniforme(linha: usize, r: usize, etiqueta: &[u8; 8], semente: &[u8;
     v
 }
 
-/// Para cada uma das k posições, dois índices distintos em [0, r): o do +1 e o do −1.
 pub fn pares(k: usize, r: usize, etiqueta: &[u8; 8], semente: &[u8; 32], blocos: &mut u64) -> Vec<(u32, u32)> {
     let mascara = (r - 1) as u32;
     let mut v = Vec::with_capacity(k);
@@ -373,7 +318,7 @@ pub fn pares(k: usize, r: usize, etiqueta: &[u8; 8], semente: &[u8; 32], blocos:
             }
             let u = u32::from_le_bytes(bytes[j * 4..j * 4 + 4].try_into().unwrap());
             let primeiro = u & mascara;
-            // parte alta de (r − 1) × u: um número em [0, r − 2]; mais um, nunca é zero
+
             let salto = 1 + ((mascara as u64 * u as u64) >> 32) as u32;
             v.push((primeiro, primeiro ^ salto));
         }
@@ -383,12 +328,11 @@ pub fn pares(k: usize, r: usize, etiqueta: &[u8; 8], semente: &[u8; 32], blocos:
 }
 
 pub struct Ruido {
-    /// `linhas` × k, por linhas.
+
     pub valores: Vec<i8>,
     pub blocos_blake3: u64,
 }
 
-/// Ruído de um lado para as linhas pedidas (para B: as colunas de B). Lado A usa a semente de A.
 pub fn ruido(lado_a: bool, semente: &[u8; 32], linhas: &[usize], k: usize, r: usize) -> Ruido {
     let etiqueta: &[u8; 8] = if lado_a { b"A_tensor" } else { b"B_tensor" };
     let mut blocos = 0u64;
@@ -401,10 +345,6 @@ pub fn ruido(lado_a: bool, semente: &[u8; 32], linhas: &[usize], k: usize, r: us
     Ruido { valores, blocos_blake3: blocos }
 }
 
-// ---------------------------------------------------------------------------------------------
-// A tentativa
-// ---------------------------------------------------------------------------------------------
-
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Contagem {
     pub produtos: u64,
@@ -413,8 +353,6 @@ pub struct Contagem {
     pub compressoes_finais: u64,
 }
 
-/// Transcrito de um tile. `a` tem h linhas e `b` tem w linhas (colunas de B), todas de comprimento k,
-/// já com o ruído somado.
 pub fn transcrito(a: &[&[i8]], b: &[&[i8]], k: usize, r: usize, c: &mut Contagem) -> [u32; PALAVRAS_TRANSCRITO] {
     let (h, w) = (a.len(), b.len());
     let mut acumuladores = vec![0i32; h * w];
@@ -442,7 +380,6 @@ pub fn transcrito(a: &[&[i8]], b: &[&[i8]], k: usize, r: usize, c: &mut Contagem
     t
 }
 
-/// A única compressão BLAKE3 por tentativa: 64 bytes, chave = semente do ruído de A.
 pub fn hash_do_transcrito(t: &[u32; PALAVRAS_TRANSCRITO], semente_a: &[u8; 32], c: &mut Contagem) -> [u8; 32] {
     let mut msg = [0u8; 64];
     for (i, p) in t.iter().enumerate() {
@@ -456,12 +393,10 @@ pub fn ganha(hash: &[u8; 32], limite: &U256) -> bool {
     U256::de_bytes_le(hash).menor_ou_igual(limite)
 }
 
-/// Soma o ruído à matriz (os valores cabem sempre em int8: |64| + |63| <= 127).
 pub fn soma_ruido(matriz: &[i8], ruido: &[i8]) -> Vec<i8> {
     matriz.iter().zip(ruido).map(|(&x, &e)| (x as i32 + e as i32) as i8).collect()
 }
 
-/// Compressões de BLAKE3 para resumir `bytes` bytes de uma vez (árvore incluída).
 pub fn compressoes_blake3(bytes: u64) -> u64 {
     if bytes == 0 {
         return 1;
@@ -471,8 +406,6 @@ pub fn compressoes_blake3(bytes: u64) -> u64 {
     blocos + (pedacos - 1)
 }
 
-/// O que o verificador aceita, pela ordem em que o verifica. Devolve o motivo da recusa.
-/// `consenso` junta a regra da rede principal (rank >= 128), que é do nó e não do verificador puro.
 pub fn forma_legal(cfg: &Configuracao, m: u32, n: u32, consenso: bool) -> Result<(), String> {
     let (k, r, h, w) = (cfg.k as usize, cfg.rank as usize, cfg.h(), cfg.w());
     if !(r.is_power_of_two() && (32..=1024).contains(&r)) {

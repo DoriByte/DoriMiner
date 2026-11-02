@@ -594,7 +594,7 @@ dependencies = [
 
 [[package]]
 name = "dori-miner"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "clap 4.6.7",
  "ctrlc",
@@ -685,7 +685,7 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "erg-cuda"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "primitive-types 0.13.1",
  "sha2",
@@ -1552,7 +1552,7 @@ dependencies = [
 
 [[package]]
 name = "prl-cuda"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "prl-pow",
  "sha2",
@@ -1560,7 +1560,7 @@ dependencies = [
 
 [[package]]
 name = "prl-pow"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "base64 0.21.7",
  "bincode",
@@ -1619,7 +1619,7 @@ checksum = "5872607e25ea4ee5fb37e64bf1462168e1a36a4e719cdc8a105533c708253918"
 
 [[package]]
 name = "qtc-cuda"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "cudarc",
  "hex",
@@ -1631,7 +1631,7 @@ dependencies = [
 
 [[package]]
 name = "qtc-pow"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "hex",
  "primitive-types 0.13.1",
@@ -2405,7 +2405,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "vela-cuda"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "sha2",
 ]

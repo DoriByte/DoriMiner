@@ -1,9 +1,3 @@
-//! Client for the Kryptex Quantus pool dialect: newline-delimited JSON over TCP
-//! or TLS, with `login`, pushed `job` notifications and `submit`.
-//!
-//! Kryptex does not publish this protocol: the message shapes here are the ones
-//! the pool sends and accepts.
-
 use crate::state::{Share, Shared};
 use crate::worker::MAX_EXTRANONCE;
 use primitive_types::U512;
@@ -19,31 +13,27 @@ use std::time::{Duration, Instant};
 
 const LOGIN_ID: u64 = 1;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-/// How long the client waits for a share before it looks at the socket again.
-/// A share wakes it at once; a new job is noticed within this.
+
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
-/// The pause of the fast poll.
+
 const FAST_POLL_INTERVAL: Duration = Duration::from_millis(1);
-/// How long a write may stay blocked before the link counts as dead.
+
 const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
-/// Jobs arrive every few seconds; this long without a line means a dead link.
+
 const SILENCE_LIMIT: Duration = Duration::from_secs(90);
 const KEEPALIVE_EVERY: Duration = Duration::from_secs(30);
-/// A share is answered in well under a second (60 ms typical, 521 ms the slowest of 2 371 logged); this long without an
-/// answer means the link is dead even though the socket still looks open (the ERG client lost 5 minutes to a 1-minute
-/// network drop on 29/10 before the same rule went in there).
+
 const ANSWER_DEADLINE: Duration = Duration::from_secs(30);
-/// How long the pool may take to answer the login before the link is dropped
-/// and made again.
+
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_LINE: usize = 64 * 1024;
-/// The longest job id taken from the pool: every share carries a copy of it.
+
 const MAX_JOB_ID: usize = 128;
-/// The whole TLS handshake, however slowly the server answers.
+
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(20);
-/// Shares sent in one pass before the pool's messages are read again.
+
 const SHARES_PER_PASS: usize = 64;
-/// Shares the pool has not answered yet: more than this and the link is not working.
+
 const MAX_PENDING: usize = 4096;
 
 #[derive(Clone, Debug)]
@@ -51,20 +41,16 @@ pub struct PoolConfig {
     pub host: String,
     pub port: u16,
     pub tls: bool,
-    /// SHA-256 of the server certificate to require. Without it the TLS link is
-    /// encrypted but the server is not authenticated (the pool's certificate is
-    /// self-signed).
+
     pub tls_fingerprint: Option<[u8; 32]>,
     pub login: String,
     pub password: String,
     pub agent: String,
-    /// Look at the socket more often than the default poll does.
+
     pub fast_poll: bool,
-    /// Send a share even when the job changed while it waited, instead of
-    /// dropping it.
+
     pub submit_late: bool,
-    /// The dev fee link: connected only while the schedule wants it, and its jobs
-    /// reach the GPUs only during a dev fee window (`devfee.rs`).
+
     pub dev: bool,
 }
 
@@ -79,7 +65,6 @@ impl PoolConfig {
     }
 }
 
-/// Splits `[scheme://]host:port`. A `ssl`/`tls` scheme turns TLS on.
 pub fn parse_pool_url(url: &str) -> Result<(String, u16, bool), String> {
     let (scheme, rest) = match url.split_once("://") {
         Some((scheme, rest)) => (scheme.to_ascii_lowercase(), rest),
@@ -123,16 +108,14 @@ pub enum Incoming {
     LoginOk {
         session: String,
         job: Option<PoolJob>,
-        /// Why the job that came with the reply could not be used. The login
-        /// itself still counts: the session is needed for the jobs that follow.
+
         bad_job: Option<String>,
-        /// The pool answers `keepalived` pings.
+
         keepalive: bool,
     },
     LoginFailed(String),
     Job(PoolJob),
-    /// A job notification this miner cannot mine. The pool has replaced the
-    /// job before it all the same.
+
     BadJob(String),
     SubmitResult {
         id: u64,
@@ -295,7 +278,6 @@ pub fn submit_line(id: u64, session: &str, share: &Share) -> String {
 pub(crate) trait Transport: Read + Write + Send {}
 impl<T: Read + Write + Send> Transport for T {}
 
-/// Accepts the server's certificate, optionally requiring a known fingerprint.
 #[derive(Debug)]
 struct FingerprintVerifier {
     pin: Option<[u8; 32]>,
@@ -435,20 +417,16 @@ pub(crate) fn connect(cfg: &PoolConfig) -> Result<Box<dyn Transport>, String> {
     Ok(Box::new(rustls::StreamOwned::new(tls, tcp)))
 }
 
-/// Pools whose certificate this version has seen: the end of the host name and the
-/// SHA-256 of the certificate. Used only to warn, never to refuse: a pool may renew
-/// its certificate at any time, and the miner must not stop for that.
-/// All seen on 2026-10-11, on every regional host each pool lists.
 const KNOWN_FINGERPRINTS: &[(&str, &str)] = &[
-    // qtc, qtc-eu, qtc-us, qtc-sg, qtc-ru, port 8049
+
     (".kryptex.network", "0fa7a4c10145c389b35d0fbcf3d9c1436d06455551a9bd43de1e3b74b5d58b16"),
-    // LuckyPool: eu, us, sg, port 5660
+
     (".lproute.com", "e3b4a63dacb32ff7c89b70c9de488f7335ddbd35e6b69a541da0ecee3f2e534f"),
-    // quantus, stratum-eu2, stratum-ord, stratum-hkg, port 7074
+
     (".suprnova.cc", "6502aeec80ac632364f8d12b21bf370ee6d5a31da911187e16fb8ff2d00cc948"),
-    // eu, in, ca, port 1336
+
     (".himpool.com", "681e0a0b0ba62be779582c2d5dd19c115be20d29660cfeda59a2f4c937c765c4"),
-    // eu, us, cn (.com) and ru (.org), port 5660
+
     (".k1pool.com", "689227ee170bb9b8c193a56bc685a944eba6431b1713938c4ed1ac4ba84907f6"),
     (".k1pool.org", "689227ee170bb9b8c193a56bc685a944eba6431b1713938c4ed1ac4ba84907f6"),
 ];
@@ -461,8 +439,6 @@ fn known_fingerprint(host: &str) -> Option<&'static str> {
         .map(|(_, fingerprint)| *fingerprint)
 }
 
-/// Buffers bytes from a transport with a short read timeout and hands back
-/// whole lines.
 pub(crate) struct LineReader {
     pub(crate) buffer: Vec<u8>,
 }
@@ -496,7 +472,6 @@ impl LineReader {
     }
 }
 
-/// Writes one line to a non-blocking transport, waiting out a full send buffer.
 pub(crate) fn send_line(transport: &mut dyn Transport, line: &str) -> Result<(), String> {
     let mut data = Vec::with_capacity(line.len() + 1);
     data.extend_from_slice(line.as_bytes());
@@ -533,8 +508,7 @@ fn publish_job(shared: &Shared, dev: bool, job: PoolJob) {
     let Some(target) = qtc_pow::target_from_difficulty(job.difficulty) else {
         return;
     };
-    // A pool may repeat the job it already sent; restarting the search for it
-    // would throw away the shares in flight.
+
     if shared.work().is_some_and(|work| {
         work.dev == dev
             && work.job_id == job.job_id
@@ -544,7 +518,7 @@ fn publish_job(shared: &Shared, dev: bool, job: PoolJob) {
     }) {
         return;
     }
-    log::info!(target: crate::ui::JOB, 
+    log::info!(target: crate::ui::JOB,
         "new job {}{} (share difficulty {})",
         if dev { "for the dev fee " } else { "" },
         job.job_id,
@@ -560,8 +534,6 @@ fn publish_job(shared: &Shared, dev: bool, job: PoolJob) {
     );
 }
 
-/// One connection, from login until it fails or a stop is requested. `Ok` means
-/// stop; the flag says whether the pool ever accepted the login.
 fn session(
     cfg: &PoolConfig,
     shared: &Shared,
@@ -574,14 +546,13 @@ fn session(
     let mut reader = LineReader { buffer: Vec::new() };
     let mut session_id: Option<String> = None;
     let mut next_id = LOGIN_ID + 1;
-    // When each request was sent, and whether its share was already late.
+
     let mut pending: HashMap<u64, (Instant, bool)> = HashMap::new();
     let mut last_line = Instant::now();
     let mut keepalive = false;
     let mut last_sent = Instant::now();
     let connected = Instant::now();
-    // The two links take turns at the GPUs. Each keeps the pool's last job, to
-    // hand it over the moment its turn comes.
+
     let dev = cfg.dev;
     let turn = || shared.fee.active.load(Ordering::SeqCst) == dev;
     let counters = if dev {
@@ -604,7 +575,7 @@ fn session(
         if has_turn && !had_turn {
             match &latest {
                 Some(job) => publish_job(shared, dev, job.clone()),
-                // Nothing of this link to mine: the other link's job must not stay.
+
                 None => shared.clear_work(),
             }
         }
@@ -617,7 +588,7 @@ fn session(
         }
         for line in reader.poll(transport)? {
             let incoming = parse_incoming(&line);
-            // Only a message this miner can read counts as the pool being there.
+
             if incoming.is_ok() {
                 last_line = Instant::now();
             }
@@ -648,8 +619,7 @@ fn session(
                 Ok(Incoming::LoginFailed(message)) => {
                     return Err(format!("the pool refused the login: {message}"));
                 }
-                // Shares need the session: a job that comes before the login
-                // is answered would be mined for nothing.
+
                 Ok(Incoming::Job(_)) if session_id.is_none() => {
                     log::warn!("ignored a job that came before the login was answered");
                 }
@@ -660,8 +630,7 @@ fn session(
                     }
                 }
                 Ok(Incoming::BadJob(e)) => {
-                    // The pool has dropped the job before this one: stop
-                    // rather than mine shares it will call stale.
+
                     log::error!("a job that cannot be mined ({e}), idle until the next: {line}");
                     latest = None;
                     if turn() {
@@ -704,7 +673,7 @@ fn session(
                 .ready
                 .store(session_id.is_some() && latest.is_some(), Ordering::SeqCst);
         }
-        // Wait here, so a share goes out the moment a GPU finds it.
+
         let mut next_share = if cfg.fast_poll {
             let share = shares.try_recv().ok();
             if share.is_none() {
@@ -721,8 +690,7 @@ fn session(
                 }
             }
         };
-        // A bounded pass: the pool's messages are read again in between, so a pool
-        // that makes shares pour in cannot keep this loop from seeing it go quiet.
+
         let mut sent_now = 0;
         while let Some(share) = next_share.take() {
             sent_now += 1;
@@ -730,7 +698,7 @@ fn session(
                 next_share = shares.try_recv().ok();
             }
             let Some(session_id) = &session_id else {
-                // Found for a job of the link before this one.
+
                 stale.fetch_add(1, Ordering::Relaxed);
                 log::info!(
                     "dropped a share for job {}: found before this login",
@@ -738,7 +706,7 @@ fn session(
                 );
                 continue;
             };
-            // The job changed while the share waited: the pool would call it stale.
+
             let late = share.generation != shared.generation();
             if late && !cfg.submit_late {
                 stale.fetch_add(1, Ordering::Relaxed);
@@ -762,8 +730,7 @@ fn session(
                 last_sent = Instant::now();
             }
         }
-        // dead link: a share unanswered for ANSWER_DEADLINE and nothing at all from the pool in that time (a pool that
-        // is alive but leaves a submit unanswered, a late share say, keeps the link; its entry goes after SILENCE_LIMIT)
+
         if last_line.elapsed() > ANSWER_DEADLINE && pending.values().any(|(sent, _)| sent.elapsed() > ANSWER_DEADLINE) {
             return Err(format!("no answer to a share in {} seconds", ANSWER_DEADLINE.as_secs()));
         }
@@ -777,13 +744,11 @@ fn session(
     }
 }
 
-/// Keeps a pool connection up until a stop is requested, reconnecting with a
-/// growing delay.
 pub fn run(cfg: PoolConfig, shared: Arc<Shared>, shares: Receiver<Share>) {
     let mut delay = Duration::from_secs(1);
     while !shared.stopping() {
         if cfg.dev && !shared.fee.wanted.load(Ordering::SeqCst) {
-            // Not its time: shares that came late for it are dropped.
+
             while shares.try_recv().is_ok() {}
             std::thread::sleep(Duration::from_millis(100));
             delay = Duration::from_secs(1);
@@ -792,8 +757,7 @@ pub fn run(cfg: PoolConfig, shared: Arc<Shared>, shares: Receiver<Share>) {
         let mut logged_in = false;
         let result = session(&cfg, &shared, &shares, &mut logged_in);
         if cfg.dev {
-            // The schedule ends the window when the link is not ready, and
-            // the other link takes the GPUs back.
+
             shared.fee.ready.store(false, Ordering::SeqCst);
         } else {
             shared.pool_connected.store(false, Ordering::SeqCst);
@@ -845,8 +809,6 @@ mod tests {
         }
     }
 
-    /// A pool that logs a client in and then does what `script` says with the
-    /// connection. Returns its port.
     fn scripted(
         script: impl FnOnce(std::io::Lines<BufReader<TcpStream>>, TcpStream) + Send + 'static,
     ) -> (u16, std::thread::JoinHandle<()>) {
@@ -872,8 +834,6 @@ mod tests {
         }
     }
 
-    /// With `submit_late` a share for a replaced job goes out, and the pool's
-    /// answer to it is counted apart.
     #[test]
     fn late_shares_are_sent_when_asked() {
         let (port, server) = scripted(|mut lines, mut out| {
@@ -886,7 +846,7 @@ mod tests {
                 r#"{{"id":{id},"error":null,"result":{{"status":"OK"}}}}"#
             )
             .unwrap();
-            // Hold the link until the client has counted the answer.
+
             let _ = lines.next();
         });
         let shared = Arc::new(Shared::new("test".into(), Vec::new()));
@@ -905,7 +865,7 @@ mod tests {
                 .work()
                 .is_some_and(|w| w.job_id == "f5f6dbc4_18253611008")
         });
-        // A share of the first job (generation 1), found too late.
+
         share_tx
             .send(Share {
                 generation: 1,
@@ -1022,7 +982,7 @@ mod tests {
         let ok = job(&format!(r#"{{"job_id":"a","mining_hash":"{hash}","difficulty":"340282366920938463463374607431768211456"}}"#)).unwrap();
         assert_eq!(ok.difficulty, U512::one() << 128);
         assert!(ok.extranonce.is_empty());
-        // The extranonce and this miner's 8 bytes share half the nonce.
+
         let with = |bytes: usize| {
             job(&format!(
                 r#"{{"job_id":"a","mining_hash":"{hash}","difficulty":1,"extranonce":"{}"}}"#,
@@ -1037,8 +997,6 @@ mod tests {
 
     const FLOAT_DIFFICULTY: (&str, &str) = (r#""difficulty":18253611008"#, r#""difficulty":1.5"#);
 
-    /// A login reply whose job cannot be read still opens the session; a job
-    /// push that cannot be read is told apart from any other bad line.
     #[test]
     fn unreadable_jobs_are_told_apart() {
         let reply = LOGIN_REPLY.replace(FLOAT_DIFFICULTY.0, FLOAT_DIFFICULTY.1);
@@ -1063,10 +1021,6 @@ mod tests {
         ));
     }
 
-    /// The login reply carries a job this miner cannot read: the session is
-    /// kept, the next job is mined and its share reaches the pool. Then a job
-    /// push that cannot be read withdraws the work instead of leaving the
-    /// cards on the job the pool has just replaced.
     #[test]
     fn a_bad_job_neither_loses_the_session_nor_leaves_dead_work() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -1128,8 +1082,6 @@ mod tests {
         server.join().unwrap();
     }
 
-    /// A job pushed before the login is answered is not mined, and a share
-    /// that reaches a link with no session is counted, not lost.
     #[test]
     fn nothing_is_mined_or_lost_before_the_login_is_answered() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -1193,11 +1145,9 @@ mod tests {
         assert!(result.ends_with("1234"));
     }
 
-    /// The dev fee link and the user's take turns: each mines its own jobs and
-    /// gets its own shares, and the user's link stays up through the window.
     #[test]
     fn the_two_links_take_turns() {
-        // A pool that logs one client in with the job `job`, answers one share and waits.
+
         fn pool(job: &'static str) -> (u16, std::thread::JoinHandle<String>) {
             let listener = TcpListener::bind("127.0.0.1:0").unwrap();
             let port = listener.local_addr().unwrap().port();
@@ -1248,12 +1198,10 @@ mod tests {
         assert!(!first.dev && first.job_id.starts_with("86334eee"));
         assert!(!fee.ready.load(Ordering::SeqCst), "the dev fee link waits to be asked for");
 
-        // The link comes up; the GPUs are still the user's.
         fee.wanted.store(true, Ordering::SeqCst);
         wait_until("the dev fee link", || fee.ready.load(Ordering::SeqCst));
         assert_eq!(shared.generation(), first.generation);
 
-        // The window: the dev fee job, its share to its link, its own count.
         fee.active.store(true, Ordering::SeqCst);
         wait_until("the dev fee job", || shared.work().is_some_and(|work| work.dev));
         let window = shared.work().unwrap();
@@ -1263,7 +1211,6 @@ mod tests {
         assert_eq!(shared.accepted.load(Ordering::Relaxed), 0);
         assert!(shared.pool_connected.load(Ordering::SeqCst));
 
-        // The end: the user's job is back without a new login, the dev fee link goes away.
         fee.active.store(false, Ordering::SeqCst);
         fee.wanted.store(false, Ordering::SeqCst);
         wait_until("the user's job again", || shared.work().is_some_and(|work| !work.dev));
@@ -1304,7 +1251,7 @@ mod tests {
             )
             .unwrap();
             writeln!(out, "{JOB_PUSH}").unwrap();
-            // Wait for the client to confirm it saw the new job, then drop the link.
+
             seen_tx.send(lines.next().unwrap().unwrap()).unwrap();
             drop(out);
             drop(lines);
@@ -1363,7 +1310,7 @@ mod tests {
                 .work()
                 .is_some_and(|w| w.job_id == "f5f6dbc4_18253611008")
         });
-        // A share for the old job is dropped locally; one for the new job goes out.
+
         share_tx
             .send(share(work.generation, &work.job_id, 0x22))
             .unwrap();
@@ -1376,7 +1323,6 @@ mod tests {
         assert_eq!(submit["params"]["job_id"], "f5f6dbc4_18253611008");
         assert_eq!(shared.stale.load(Ordering::Relaxed), 1);
 
-        // The pool drops the link: work is withdrawn and the client logs in again.
         wait("work to be withdrawn", &|| shared.work().is_none());
         assert!(!shared.pool_connected.load(Ordering::SeqCst));
         let relogin: Value = serde_json::from_str(&next()).unwrap();

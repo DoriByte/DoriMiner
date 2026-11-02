@@ -1,59 +1,35 @@
-//! The optional dev fee: a share of the time mined for the DoriByte wallet, on the
-//! same pool the user chose. Optional: 1% unless the user says
-//! otherwise (`--dev-fee PERCENT`; `--dev-fee 0` turns it off).
-//!
-//! The GPUs mine for the user until a window is due; then a second pool link logs
-//! in with the DoriByte wallet, the GPUs take its jobs for `WINDOW`, and the user's
-//! link, which never went down, gets them back. A window is never allowed to cost
-//! the user more than its own length: it does not start while the user's pool is
-//! down, it is skipped when the dev fee link does not come up, and it ends the
-//! moment that link fails.
-//!
-//! The fee is never more than the percentage, whatever the length of the run: a
-//! window comes only after the whole of its gap was mined for the user (99 minutes
-//! for 1%), the first one included, and only the time the user's pool link was up
-//! counts towards the gap. A run shorter than the gap has no window at all, and
-//! nothing is carried from one run to the next.
-
 use crate::state::Shared;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
-/// The DoriByte wallet for Quantus. Public, and the same one Dori Rig shows.
 pub const DEV_WALLET: &str = "qzjcpLMMxF6D7d2vZeMwJDxdi5zRSe9xCJ1Dpmvf6Nt1zD4aM";
-/// The DoriByte wallet for Pearl, the same one Dori Rig shows.
-/// The Vela wallet for the dev fee.
+
 pub const DEV_WALLET_VELA: Option<&str> = Some("vela1qmd59xn3s9epg5trv8392vpmypmz0zkh03dz64t");
-/// The DoriByte wallet for Ergo.
+
 pub const DEV_WALLET_ERG: Option<&str> = Some("9gRarjaNH6e7AVWBBycVwYQk4tCKX6MQozKxiKxLzy3XnB4anvE");
+
 pub const DEV_WALLET_PEARL: &str = "prl1pgnhm0239cukx8wpkrze90axl887c4k62j4pnhjd0uulu4ynlj0vq020mtc";
-/// The worker name on the DoriByte account: the user's own stays out of it.
+
 pub const DEV_WORKER: &str = "doriminer";
-/// The fee when the user gives none.
+
 pub const DEFAULT_PERCENT: u64 = 1;
-/// The highest fee that can be asked for.
+
 pub const MAX_PERCENT: u64 = 5;
 
-/// How long one dev fee window lasts.
 pub const WINDOW: Duration = Duration::from_secs(60);
-/// A window is closed this much before `WINDOW` is up: the main loop looks at the
-/// clock a few times a second, and a look that comes late must not make the fee
-/// more than its percentage.
+
 const MARGIN: Duration = Duration::from_secs(2);
-/// The password of the dev fee link. The user's own is not sent on it.
+
 pub const DEV_PASSWORD: &str = "x";
-/// How long the dev fee link has to log in and get a job before the window is skipped.
+
 const CONNECT_WAIT: Duration = Duration::from_secs(60);
-/// After a skipped window, the next try.
+
 const RETRY_AFTER: Duration = Duration::from_secs(10 * 60);
 
-/// The login of the dev fee link, in the form of the user's: `wallet/worker`
-/// (Kryptex), `wallet.worker`, or the wallet alone.
 pub fn dev_login(user_login: &str) -> String {
     dev_login_with(DEV_WALLET, user_login)
 }
 
-/// The same with another coin's DoriByte wallet.
 pub fn dev_login_with(wallet: &str, user_login: &str) -> String {
     if user_login.contains('/') {
         format!("{wallet}/{DEV_WORKER}")
@@ -64,18 +40,17 @@ pub fn dev_login_with(wallet: &str, user_login: &str) -> String {
     }
 }
 
-/// Mining for the user between two windows, so that `WINDOW` is `percent` of the whole.
 fn gap(percent: u64) -> Duration {
     WINDOW * (100 - percent as u32) / percent as u32
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum State {
-    /// For the user, until this much more was mined with the user's pool link up.
+
     User { left: Duration },
-    /// The dev fee link was asked for; the GPUs are still the user's.
+
     Connecting { since: Instant },
-    /// The GPUs are on the dev fee link's jobs.
+
     Window { since: Instant },
 }
 
@@ -86,7 +61,7 @@ pub struct Schedule {
 }
 
 impl Schedule {
-    /// `None` when the fee is off.
+
     pub fn new(shared: &Shared, now: Instant) -> Option<Self> {
         let percent = shared.fee.percent.load(Ordering::Relaxed);
         (percent > 0).then(|| Self {
@@ -96,14 +71,13 @@ impl Schedule {
         })
     }
 
-    /// Called a few times a second by the main loop.
     pub fn tick(&mut self, shared: &Shared, now: Instant) {
         let fee = &shared.fee;
         let passed = now.saturating_duration_since(self.last_tick);
         self.last_tick = now;
         match self.state {
             State::User { left } => {
-                // Time with the user's pool down was not mined for the user.
+
                 if !shared.pool_connected.load(Ordering::SeqCst) {
                     return;
                 }
@@ -137,8 +111,7 @@ impl Schedule {
                     fee.wanted.store(false, Ordering::SeqCst);
                     fee.seconds
                         .fetch_add(now.duration_since(since).as_secs(), Ordering::Relaxed);
-                    // The user's link puts its job back when it sees the turn
-                    // change; if it is down there is nobody to do it.
+
                     if !shared.pool_connected.load(Ordering::SeqCst) {
                         shared.clear_work();
                     }
@@ -165,7 +138,7 @@ mod tests {
         shared.pool_connected.store(true, Ordering::SeqCst);
         shared
     }
-    /// (the link is wanted, the GPUs are on it)
+
     fn flags(shared: &Shared) -> (bool, bool) {
         (
             shared.fee.wanted.load(Ordering::SeqCst),
@@ -220,7 +193,7 @@ mod tests {
         schedule.tick(&shared, close);
         assert_eq!(flags(&shared), (false, false));
         assert_eq!(shared.fee.seconds.load(Ordering::Relaxed), (WINDOW - MARGIN).as_secs());
-        // The next one is a whole gap away.
+
         shared.fee.ready.store(false, Ordering::SeqCst);
         schedule.tick(&shared, close + gap(1) - Duration::from_secs(1));
         assert_eq!(flags(&shared), (false, false));
@@ -236,7 +209,7 @@ mod tests {
         let mut schedule = Schedule::new(&shared, start).unwrap();
         schedule.tick(&shared, start + gap(1) * 2);
         assert_eq!(flags(&shared), (false, false));
-        // And that time does not count: the whole gap is still to be mined.
+
         shared.pool_connected.store(true, Ordering::SeqCst);
         schedule.tick(&shared, start + gap(1) * 3 - Duration::from_secs(1));
         assert_eq!(flags(&shared), (false, false));
@@ -246,8 +219,7 @@ mod tests {
 
     #[test]
     fn the_fee_is_never_more_than_the_percentage() {
-        // Whatever the length of the run, with the main loop looking at the clock
-        // late (every 1.3 s instead of every 0.2 s).
+
         for percent in 1..=MAX_PERCENT {
             let shared = shared(percent);
             shared.fee.ready.store(true, Ordering::SeqCst);
@@ -256,7 +228,7 @@ mod tests {
             let (mut fee, step) = (Duration::ZERO, Duration::from_millis(1300));
             for look in 1..=(8 * 3600 * 10 / 13u64) {
                 let now = start + step * look as u32;
-                // The time since the last look was spent as the last look left it.
+
                 if shared.fee.active.load(Ordering::SeqCst) {
                     fee += step;
                 }
@@ -295,7 +267,7 @@ mod tests {
         schedule.tick(&shared, due);
         assert_eq!(flags(&shared), (true, true));
         shared.fee.ready.store(false, Ordering::SeqCst);
-        // The user's pool is down too: the dev fee job must not stay on the GPUs.
+
         shared.pool_connected.store(false, Ordering::SeqCst);
         schedule.tick(&shared, due + Duration::from_secs(7));
         assert_eq!(flags(&shared), (false, false));

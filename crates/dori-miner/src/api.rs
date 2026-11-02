@@ -1,7 +1,3 @@
-//! Local read-only HTTP API. `GET /summary` returns JSON a manager app can
-//! read: hash rates in H/s, cumulative share counts, and one entry per GPU
-//! keyed by PCI address.
-
 use crate::state::Shared;
 use serde_json::{json, Value};
 use std::net::SocketAddr;
@@ -9,7 +5,6 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Accepts `PORT` or `ADDRESS:PORT`. A bare port binds to localhost.
 pub fn parse_bind(text: &str) -> Result<SocketAddr, String> {
     if let Ok(port) = text.parse::<u16>() {
         return Ok(SocketAddr::from(([127, 0, 0, 1], port)));
@@ -75,7 +70,6 @@ pub fn summary(shared: &Shared) -> Value {
     out
 }
 
-/// True for `localhost` and for any IP address, with or without a port.
 fn host_is_local_or_address(host: &str) -> bool {
     let is_address = |h: &str| h.trim_matches(|c| c == '[' || c == ']').parse::<std::net::IpAddr>().is_ok();
     let name = match host.rsplit_once(':') {
@@ -86,7 +80,6 @@ fn host_is_local_or_address(host: &str) -> bool {
     name.eq_ignore_ascii_case("localhost")
 }
 
-/// Serves until a stop is requested.
 pub fn run(bind: SocketAddr, shared: Arc<Shared>) -> Result<std::thread::JoinHandle<()>, String> {
     let server = tiny_http::Server::http(bind)
         .map_err(|e| format!("could not open the API on {bind}: {e}"))?;
@@ -109,10 +102,7 @@ pub fn run(bind: SocketAddr, shared: Arc<Shared>) -> Result<std::thread::JoinHan
                 Err(_) => break,
             };
             let path = request.url().split('?').next().unwrap_or("");
-            // A web page open in the user's browser can make a name of its own
-            // point at this PC and read the answer; it cannot make the browser
-            // send a Host that is an address. (An API opened to the network on
-            // purpose is reached by whatever name the machine has there.)
+
             let host = request
                 .headers()
                 .iter()
@@ -184,7 +174,6 @@ mod tests {
         assert!(parse_bind("nope").is_err());
     }
 
-    /// The fields the manager app reads.
     #[test]
     fn summary_has_the_fields_the_manager_reads() {
         let value = summary(&shared());
@@ -198,7 +187,7 @@ mod tests {
         assert!(total > 900e6 && total < 1100e6, "hashrate {total}");
         let gpu = &value["gpus"][0];
         assert_eq!(gpu["pci_bus_id"], "0000:01:00.0");
-        // Read a moment apart from the total, so equal only to within the clock.
+
         let per_gpu = gpu["hashrate"].as_f64().unwrap();
         assert!(
             (per_gpu - total).abs() < total * 0.01,
@@ -226,7 +215,7 @@ mod tests {
             text
         };
         let get = |path: &str| get_as(path, "127.0.0.1");
-        // A page in a browser reaches this port under a name of its own.
+
         assert!(get_as("/summary", "evil.example").starts_with("HTTP/1.1 403"));
         let reply = get("/summary");
         assert!(reply.starts_with("HTTP/1.1 200"));

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'" />
+    <title>DoriMiner Control</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img class="logo" src="../assets/icon-96.png" alt="" width="40" height="40" />
+        <div>
+          <h1 class="brand-name"><svg class="wordmark" viewBox="0 0 103 29" role="img" aria-label="DoriMiner"><defs><mask id="wm-doriminer" maskUnits="userSpaceOnUse" x="-2" y="-2" width="107" height="33"><rect x="-2" y="-2" width="107" height="33" fill="#fff" /><path d="M1.1 10.05L3.6 12.25L1.1 14.45Z" /><path d="M42.1 10.05L44.6 12.25L42.1 14.45Z" /></mask></defs><g mask="url(#wm-doriminer)" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><g stroke="currentColor"><path d="M3 4.5V20H6.5a7.75 7.75 0 0 0 0-15.5Z" /><circle cx="21" cy="14.5" r="5.5" /><path d="M30 20V9.5M30 14q0-4.5 5-4.5" /><path d="M39 10V20" /><circle cx="39" cy="4.6" r="1.6" fill="currentColor" stroke="none" /></g><g class="wordmark-soft"><path d="M44 20V4.5L50.75 14.5 57.5 4.5V20" /><path d="M62 10V20" /><path d="M67 20V9.5M67 14.5a5 5 0 0 1 10 0V20" /><path d="M81 14.5h11a5.5 5.5 0 1 0-1.6 3.9" /><path d="M96 20V9.5M96 14q0-4.5 5-4.5" /><circle cx="62" cy="4.6" r="1.6" class="wordmark-dot" stroke="none" /></g></g></svg><span class="h1-rest">Control</span></h1>
+          <p class="subtitle" id="subtitle"></p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span class="pill pill-muted" id="state-pill"></span>
+        <button class="icon-btn" id="pin" type="button" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 3h6l-1 6 3 3v2h-4v6l-1 1-1-1v-6H7v-2l3-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
+        </button>
+        <button class="icon-btn" id="mode" type="button">
+          <svg class="ico-to-window" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M3 9h18" stroke="currentColor" stroke-width="1.8" /></svg>
+          <svg class="ico-to-compact" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M11 18.5h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+        </button>
+        <button class="power power-off" id="power" type="button"><span class="power-knob"></span><span id="power-text">Off</span></button>
+      </div>
+    </header>
+
+    <main class="page">
+      <nav class="tabs" role="tablist">
+        <button class="tab tab-active" data-tab="summary" type="button" data-i="tabSummary"></button>
+        <button class="tab" data-tab="profiles" type="button" data-i="tabProfiles"></button>
+        <button class="tab" data-tab="settings" type="button" data-i="tabSettings"></button>
+      </nav>
+
+      <div class="notice" id="notice" hidden><p id="notice-text"></p><div class="actions" id="notice-actions"></div></div>
+
+      <section id="tab-summary" class="stack">
+        <div class="profile-bar" hidden><select id="quick-profile"></select></div>
+        <div class="tiles tiles-two">
+          <div class="tile tile-wide tile-mining">
+            <div class="tile-label"><img class="coin-ico" id="coin-ico" alt="" width="20" height="20" hidden /><span data-i="hashrate"></span><span class="pill pill-muted" id="oc-pill" hidden></span><span class="pill" id="hero-state"></span></div>
+            <div class="tile-value" id="t-hash">–</div>
+            <div class="meta" id="t-hash-meta"></div>
+            <div class="tile-rows">
+              <div><div class="meta" data-i="shares"></div><div class="tile-small" id="t-shares">–</div><div class="meta" id="t-shares-meta"></div></div>
+              <div><div class="meta" data-i="pool"></div><div class="tile-small" id="t-pool">–</div><div class="meta" id="t-pool-meta"></div></div>
+              <div><div class="meta" data-i="income"></div><div class="tile-small" id="t-earn">–</div></div>
+            </div>
+          </div>
+          <div class="tile tile-wide tile-energy">
+            <div class="tile-label" data-i="power"></div>
+            <div class="tile-value" id="t-watts">–</div>
+            <div class="meta" id="t-watts-meta"></div>
+            <div class="tile-rows">
+              <div><div class="meta" data-i="energy"></div><div class="tile-small" id="t-energy">–</div><div class="meta" id="t-energy-meta"></div></div>
+              <div><div class="meta" data-i="energyToday2"></div><div class="tile-small" id="t-energy-today">–</div><div class="meta" id="t-energy-today-meta"></div></div>
+              <div><div class="meta" data-i="energy30"></div><div class="tile-small" id="t-energy-30">–</div><div class="meta" id="t-energy-30-meta"></div></div>
+            </div>
+          </div>
+        </div>
+        <span id="t-up" hidden></span><span id="t-up-meta" hidden></span>
+        <div id="gpus" class="stack"></div>
+        <div class="card" id="log-card" hidden>
+          <div class="section-head"><h2 data-i="minerOutput"></h2></div>
+          <pre class="log" id="log"></pre>
+        </div>
+      </section>
+
+      <section id="tab-profiles" class="stack" hidden>
+        <div id="profiles-head" class="stack"></div>
+        <div class="card stack" id="bench-card" hidden></div>
+        <div id="profiles-view" class="stack"></div>
+      </section>
+
+      <section id="tab-settings" class="stack" hidden>
+        <details class="fold card" data-fold="mining" open>
+          <summary><h2 data-i="foldMining"></h2></summary>
+        <form id="settings" autocomplete="off">
+          <div class="two">
+            <label class="field">
+              <span class="label" data-i="machineName"></span>
+              <input type="text" id="f-machine" maxlength="40" />
+              <span class="hint" data-i="machineNameHint"></span>
+              <span class="error" data-err="machineName"></span>
+            </label>
+            <label class="field">
+              <span class="label" data-i="devFee"></span>
+              <input type="number" id="f-devfee" min="0" max="5" step="1" />
+              <span class="hint" data-i="devFeeHint"></span>
+              <span class="error" data-err="devFee"></span>
+            </label>
+            <label class="field">
+              <span class="label" data-i="devices"></span>
+              <input type="text" id="f-devices" placeholder="0,1" />
+              <span class="hint" data-i="devicesHint"></span>
+              <span class="error" data-err="devices"></span>
+            </label>
+          </div>
+
+          <label class="check"><input type="checkbox" id="f-window" /><span><span class="title" data-i="showWindow"></span><br /><span class="hint" data-i="showWindowHint"></span></span></label>
+          <label class="check"><input type="checkbox" id="f-autostart" /><span><span class="title" data-i="startWithControl"></span><br /><span class="hint" data-i="startWithControlHint"></span></span></label>
+          <label class="check"><input type="checkbox" id="f-restart" /><span><span class="title" data-i="restartOnCrash"></span></span></label>
+
+          <p class="meta" id="admin-line"></p>
+
+          <details>
+            <summary class="label" data-i="advanced"></summary>
+            <div class="advanced-body">
+              <label class="field">
+                <span class="label" data-i="minerPath"></span>
+                <div class="path-row"><input type="text" class="mono" id="f-path" spellcheck="false" /><button class="btn" type="button" id="browse" data-i="browse"></button></div>
+                <span class="hint" id="path-hint"></span>
+              </label>
+              <div class="two">
+                <label class="field"><span class="label" data-i="remotePort"></span><input type="number" id="f-rport" min="1024" max="65535" /><span class="error" data-err="remote.port"></span></label>
+                <label class="field">
+                  <span class="label" data-i="remoteHttps"></span>
+                  <select id="f-rhttps"><option value="8443">8443</option><option value="443">443</option><option value="10000">10000</option></select>
+                  <span class="hint" data-i="remoteHttpsHint"></span>
+                </label>
+              </div>
+              <div class="two">
+                <label class="field"><span class="label" data-i="apiPort"></span><input type="number" id="f-port" min="1024" max="65535" /><span class="error" data-err="apiPort"></span></label>
+                <label class="field">
+                  <span class="label" data-i="language"></span>
+                  <select id="f-lang"><option value="auto" data-i="langAuto"></option><option value="pt">Português</option><option value="en">English</option></select>
+                </label>
+                <label class="field">
+                  <span class="label" data-i="currency"></span>
+                  <select id="f-currency"><option value="eur">€</option><option value="usd">$</option></select>
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <div class="save-bar">
+            <button class="btn btn-primary" type="submit" data-i="save"></button>
+            <span class="meta" id="save-msg"></span>
+          </div>
+        </form>
+        </details>
+
+        <details class="fold card" data-fold="schedule">
+          <summary><h2 data-i="tabSchedule"></h2></summary>
+        <label class="check"><input type="checkbox" id="s-enabled" /><span><span class="title" data-i="scheduleOn"></span><br /><span class="hint" data-i="scheduleHint"></span></span></label>
+          <div id="slots" class="stack"></div>
+          <div class="save-bar">
+            <button class="btn" type="button" id="add-slot" data-i="addSlot"></button>
+            <button class="btn btn-primary" type="button" id="save-schedule" data-i="save"></button>
+            <span class="meta" id="schedule-msg"></span>
+          </div>
+        </details>
+
+        <details class="fold card" data-fold="auto">
+          <summary><h2 data-i="autoTitle"></h2></summary>
+          <div id="auto-box" class="stack"></div>
+        </details>
+
+        <details class="fold card remote-box" data-fold="remote">
+          <summary><h2 data-i="remoteTitle"></h2></summary>
+          <p class="hint" data-i="remoteHint"></p>
+          <label class="check"><input type="checkbox" id="r-enabled" /><span><span class="title" data-i="remoteOn"></span><br /><span class="hint" data-i="remoteOnHint"></span></span></label>
+          <div id="r-body" hidden>
+            <p class="meta" id="r-status"></p>
+            <div class="actions"><button class="btn btn-small" type="button" id="r-serve" data-i="remoteServe"></button><button class="btn btn-small" type="button" id="r-refresh" data-i="remoteCheck"></button></div>
+            <p class="meta mono" id="r-command" hidden></p>
+            <div class="pair-row">
+              <input type="text" id="r-name" maxlength="40" />
+              <button class="btn btn-primary btn-small" type="button" id="r-pair" data-i="remotePair"></button>
+            </div>
+            <span class="error" id="r-error"></span>
+            <div class="qr-box" id="r-qr-box" hidden>
+              <div id="r-qr"></div>
+              <p class="hint" data-i="remoteQrHint"></p>
+              <p class="meta mono" id="r-url"></p>
+              <button class="btn btn-small" type="button" id="r-qr-close" data-i="remoteQrDone"></button>
+            </div>
+            <div id="r-devices" class="stack"></div>
+          </div>
+        </details>
+
+        <p class="help-line"><span data-i="helpLabel"></span> <a href="mailto:geral@doribyte.com" target="_blank" rel="noreferrer">geral@doribyte.com</a> · <a href="https://discord.gg/pEpuWh7D89" target="_blank" rel="noreferrer" data-i="helpDiscord"></a></p>
+      </section>
+    </main>
+    <div class="modal-back" id="modal" hidden></div>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,53 @@
+.phone #pin,
+.phone #mode,
+.phone .computer-only,
+.phone #tab-settings > :not(#phone-settings) { display: none !important; }
+.phone:not(.verified) .manage-only,
+.phone:not(.verified) .btn-danger,
+.phone:not(.verified) #bench-card button { display: none !important; }
+.phone-banner { margin: 0 0 10px; }
+.phone-banner[hidden] { display: none; }
+.phone-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+  text-align: center;
+}
+.phone-cover[hidden] { display: none; }
+
+.phone .page { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.phone .tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  gap: 0;
+  margin: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.phone .tab {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 4px 6px;
+  border: 0;
+  border-top: 2px solid transparent;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.phone .tab-active { border-top-color: var(--accent); }
+.tab-icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.phone .topbar .pill { display: none; }

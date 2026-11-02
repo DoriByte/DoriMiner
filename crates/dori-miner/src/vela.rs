@@ -1,12 +1,3 @@
-//! Mining Vela (VELA): `--coin vela`. Proof-of-Inference: each attempt is one step of the sd-turbo integer UNet on the
-//! job's prompt (vela-cuda, exact to the official `sdint.py`), so the rate is in inferences a second (inf/s), as the
-//! Vela miners give it. A thread per card runs batches of attempts; the CPU hashes each x0 (hashPoI, then the block
-//! hash) against the share's target, and the pool link (vela_pool.rs) sends the ones that meet it.
-//!
-//! The model (sd-turbo-int.poisd, about 1.2 GB) is downloaded on the first start from the pool's server, checked by its
-//! SHA-256 and kept in the data folder (or given with --vela-model); `GET /summary` shows the download as `model`.
-//! Each card checks itself against the official test vector before mining.
-
 use crate::pool::PoolConfig;
 use crate::state::{ModelState, Shared};
 use crate::vela_pool::{self, Jobs, Share};
@@ -19,13 +10,10 @@ use std::time::{Duration, Instant};
 
 const REPORT_EVERY: Duration = Duration::from_secs(30);
 
-/// Inferences a second as text.
 pub fn format_rate(per_sec: f64) -> String {
     format!("{per_sec:.1} inf/s")
 }
 
-/// The miner's data folder: DORI_DATA_DIR, else %LOCALAPPDATA%\DoriMiner (Windows) or $XDG_DATA_HOME/dori-miner,
-/// ~/.local/share/dori-miner (Linux). Kept across versions, so the model is downloaded once.
 pub fn data_dir() -> PathBuf {
     if let Some(d) = std::env::var_os("DORI_DATA_DIR") {
         return PathBuf::from(d);
@@ -55,7 +43,6 @@ fn set_model(shared: Option<&Shared>, state: &'static str, bytes: u64, total: u6
     }
 }
 
-/// SHA-256 of a file, as hex, reporting the bytes read.
 fn file_sha256(path: &Path, shared: Option<&Shared>) -> Result<String, String> {
     use sha2::{Digest, Sha256};
     let mut f = std::fs::File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -103,8 +90,6 @@ fn download(url: &str, to: &Path, shared: Option<&Shared>) -> Result<(), String>
     Ok(())
 }
 
-/// The model ready to read: the given file (checked), or the one in the data folder (downloaded when missing or
-/// wrong, from the pool's server and then its mirror, checked, written as .part and renamed).
 pub fn ensure_model(given: Option<&Path>, shared: Option<&Shared>) -> Result<PathBuf, String> {
     let fail = |e: String| {
         set_model(shared, "error", 0, 0, Some(e.clone()));
@@ -152,14 +137,12 @@ pub fn ensure_model(given: Option<&Path>, shared: Option<&Shared>) -> Result<Pat
     Err(fail(format!("the Vela model could not be downloaded: {last}")))
 }
 
-/// An extranonce2 of `size` bytes, random: two cards (or two machines) never mine the same attempts.
 fn extranonce2(size: usize) -> String {
     let mut b = vec![0u8; size];
     getrandom::getrandom(&mut b).expect("the system's random numbers");
     vela_cuda::hex(&b)
 }
 
-/// One card: open the engine, check it against the official vector, then batches of attempts on the current job.
 fn card(slot: usize, shared: Arc<Shared>, jobs: Arc<Jobs>, model: Arc<PathBuf>, shares: mpsc::Sender<Share>) {
     let gpu = &shared.gpus[slot];
     let ordinal = gpu.info.ordinal;
@@ -236,8 +219,6 @@ fn card(slot: usize, shared: Arc<Shared>, jobs: Arc<Jobs>, model: Arc<PathBuf>, 
     }
 }
 
-/// `bench --coin vela`: the model (downloaded if needed), each card checked against the official vector, then batches
-/// back to back for `seconds`.
 pub fn bench(devices: Option<&str>, seconds: u64, check: bool, model: Option<&Path>) -> Result<(), String> {
     if seconds == 0 {
         return Err("--duration must be at least 1".into());
@@ -297,7 +278,7 @@ pub fn mine(o: Options) -> Result<(), String> {
         let shared = shared.clone();
         ctrlc::set_handler(move || shared.request_stop()).map_err(|e| format!("could not install the stop handler: {e}"))?;
     }
-    // the dev fee is off if there is no DoriByte wallet for the coin
+
     let dev_fee = if crate::devfee::DEV_WALLET_VELA.is_some() { o.dev_fee } else { 0 };
     if o.dev_fee > 0 && dev_fee == 0 {
         log::info!("Vela: no dev fee in this version");
@@ -317,7 +298,7 @@ pub fn mine(o: Options) -> Result<(), String> {
     } else {
         log::info!("DoriMiner {} mining Vela, pool {}", env!("CARGO_PKG_VERSION"), o.config.url());
     }
-    // the API answers while the model downloads
+
     let api = o.bind.map(|bind| api::run(bind, shared.clone())).transpose()?;
     shared.fee.percent.store(dev_fee, Ordering::Relaxed);
     let model = match ensure_model(o.model.as_deref(), Some(&shared)) {
@@ -410,7 +391,6 @@ pub fn mine(o: Options) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    /// Downloads the real model (1.2 GB) into DORI_DATA_DIR: `cargo test -- --ignored downloads_the_model`.
     #[test]
     #[ignore]
     fn downloads_the_model() {
@@ -420,7 +400,7 @@ mod tests {
         assert_eq!(path, default_model_path());
         assert_eq!(shared.model.lock().unwrap().as_ref().unwrap().state, "ready");
         assert!(!path.with_extension("poisd.part").exists());
-        // a second start only checks it
+
         let started = Instant::now();
         ensure_model(None, Some(&shared)).unwrap();
         println!("checked again in {} ms", started.elapsed().as_millis());

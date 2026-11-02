@@ -1,6 +1,3 @@
-//! Published without its comments: they describe the kernel, which is closed for now (see the README).
-//! The code is all here.
-
 
 use crate::pool::PoolConfig;
 use crate::prl_pool::{self, Jobs};

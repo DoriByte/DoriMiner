@@ -1,6 +1,3 @@
-//! Published without its comments: they describe the kernel, which is closed for now (see the README).
-//! The code is all here.
-
 
 use prl_pow::{forma_legal, JobSide, Pair, Shape};
 use std::ffi::{c_char, c_int, c_void, CStr};

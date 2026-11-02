@@ -1,7 +1,3 @@
-//! The public tree's build of prl-cuda: the engine is not source here but a sealed library, one per system (kernels/sealed/linux:
-//! libprl.a; kernels/sealed/windows: prl.lib), checked against its SHA-256 table. No CUDA Toolkit is needed; at run time the
-//! engine loads the NVIDIA driver.
-
 use std::path::PathBuf;
 
 fn main() {

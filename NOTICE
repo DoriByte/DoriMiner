@@ -23,3 +23,6 @@ Pearl's official proof and verifier are linked into the miner, unchanged, from
   zk-pow and pearl-blake3: ISC License, Copyright (c) 2025-2026 Pearl Research Labs, Copyright (c) 2015-2016
   The Decred developers (licenses/pearl-ISC.txt in the package, third_party/pearl/LICENSE in the source tree);
   plonky2 (Pearl's copy): MIT or Apache-2.0 (licenses/plonky2-MIT.txt, licenses/plonky2-Apache-2.0.txt).
+
+DoriMiner Control carries Project Nayuki's QR Code generator (control/lib/vendor/qrcodegen.js), MIT License,
+  Copyright (c) Project Nayuki, https://www.nayuki.io/page/qr-code-generator-library (licence text in the file's header).

@@ -1,12 +1,3 @@
-//! CUDA search for Quantus QPoW through the sealed engine: runs launches of nonces on each card and hands back the
-//! candidates, which the host checks here with the exact hash on the CPU (`qtc_pow::get_nonce_hash`) before anything is
-//! sent to a pool.
-//!
-//! Batch launch and candidate verification are derived from `crates/engine-cuda/src/lib.rs` of
-//! Quantus-Network/quantus-miner (commit c7838cbc, Apache-2.0) and were changed by DoriByte.
-//!
-//! This file is published without its comments: they describe the kernel, which is closed (see the README).
-
 #![deny(rust_2018_idioms)]
 
 use cudarc::driver::sys;

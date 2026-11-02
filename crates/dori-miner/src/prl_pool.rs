@@ -1,11 +1,3 @@
-//! Client for the Pearl (PRL) pool dialect: newline-delimited JSON over TCP or TLS, `mining.subscribe`,
-//! `mining.authorize` with object parameters, pushed `mining.notify` jobs (a 76-byte header and a base target) and
-//! `mining.submit` with the share's whole plain proof. Seen on Kryptex (2026-10-14 to 17, every share accepted).
-//!
-//! Proof compression: the authorisation asks for `"type":"v2"`; a pool that answers with it expects every proof
-//! gzip-compressed (base64 as before), and refuses an uncompressed one. Proofs of matrices that are almost all
-//! zeros shrink about a hundred times, so they reach the pool sooner.
-
 use crate::pool::{connect, send_line, LineReader, PoolConfig};
 use crate::state::Shared;
 use prl_pow::PoolJob;
@@ -21,25 +13,23 @@ const SUBSCRIBE_ID: u64 = 1;
 const AUTHORIZE_ID: u64 = 2;
 const FIRST_SUBMIT_ID: u64 = 100;
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
-/// Pearl pools send a job about once a minute; this long without a line means a dead link.
+
 const SILENCE_LIMIT: Duration = Duration::from_secs(180);
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(20);
-/// A share the pool has not answered in this long is forgotten.
+
 const ANSWER_LIMIT: Duration = Duration::from_secs(120);
-/// The pool's code for a share of a job it has replaced.
+
 const STALE_CODE: i64 = 21;
 const MAX_JOB_ID: usize = 128;
 
-/// The job every card is on. A new generation means drop the old search.
 #[derive(Clone)]
 pub struct Work {
     pub generation: u64,
     pub job: Arc<PoolJob>,
-    /// A job of the dev fee link: its shares go there.
+
     pub dev: bool,
 }
 
-/// The Pearl job, kept apart from the Quantus work in `Shared` (whose fields are Quantus's).
 #[derive(Default)]
 pub struct Jobs {
     slot: Mutex<Option<Work>>,
@@ -55,7 +45,6 @@ impl Jobs {
         self.generation.load(Ordering::SeqCst)
     }
 
-    /// A new job, unless it is the one already being mined (a pool may send the same job again).
     fn set(&self, job: PoolJob, dev: bool) -> bool {
         let mut slot = self.slot.lock().unwrap();
         if slot.as_ref().is_some_and(|w| *w.job == job && w.dev == dev) {
@@ -77,13 +66,12 @@ impl Jobs {
     }
 }
 
-/// A share checked by the twin and the official verifier, on its way to the pool.
 pub struct Share {
-    /// Found on a job of the dev fee link.
+
     pub dev: bool,
     pub generation: u64,
     pub job_id: String,
-    /// The plain proof, serialised (bincode).
+
     pub proof: Vec<u8>,
 }
 
@@ -142,7 +130,7 @@ pub fn parse_incoming(line: &str) -> Result<Incoming, String> {
             if !ok {
                 return Ok(Incoming::Refused(v.get("error").map(error_text).unwrap_or_else(|| line.to_string())));
             }
-            // the answer carries "type":"v2" next to the result (Kryptex) or inside it
+
             let v2 = |x: &Value| x.get("type").and_then(Value::as_str) == Some("v2");
             Ok(Incoming::Authorized { compressed: v2(&v) || v2(&v["result"]) })
         }
@@ -159,7 +147,6 @@ pub fn parse_incoming(line: &str) -> Result<Incoming, String> {
     }
 }
 
-/// The wallet and the worker as the Pearl pools take them: apart.
 fn wallet_and_worker(login: &str) -> (&str, &str) {
     match login.find(['.', '/']) {
         Some(i) => (&login[..i], &login[i + 1..]),
@@ -191,7 +178,6 @@ pub fn submit_line(id: u64, cfg: &PoolConfig, share: &Share, compressed: bool) -
     .to_string()
 }
 
-/// One connection, from login until it fails or a stop is requested; `logged_in` says whether the pool accepted it.
 fn session(cfg: &PoolConfig, shared: &Shared, jobs: &Jobs, shares: &Receiver<Share>, logged_in: &mut bool) -> Result<(), String> {
     let mut transport = connect(cfg)?;
     let transport = transport.as_mut();
@@ -204,7 +190,7 @@ fn session(cfg: &PoolConfig, shared: &Shared, jobs: &Jobs, shares: &Receiver<Sha
     let mut next_id = FIRST_SUBMIT_ID;
     let connected = Instant::now();
     let mut last_line = Instant::now();
-    // The two links take turns at the cards (devfee.rs); each keeps its pool's last job for its turn.
+
     let dev = cfg.dev;
     let turn = || shared.fee.active.load(Ordering::SeqCst) == dev;
     let (accepted, rejected, stale) =
@@ -296,7 +282,7 @@ fn session(cfg: &PoolConfig, shared: &Shared, jobs: &Jobs, shares: &Receiver<Sha
                     stale.fetch_add(1, Ordering::Relaxed);
                     log::info!("dropped a share for job {}: found before this login", share.job_id);
                 }
-                // the job changed while the share was proved: the pool would call it stale
+
                 Some(_) if share.generation != jobs.generation() => {
                     stale.fetch_add(1, Ordering::Relaxed);
                     log::info!(target: crate::ui::DETAIL, "dropped a share for job {}: the job changed", share.job_id);
@@ -316,12 +302,11 @@ fn session(cfg: &PoolConfig, shared: &Shared, jobs: &Jobs, shares: &Receiver<Sha
     }
 }
 
-/// Keeps the pool connection up until a stop is requested, reconnecting with a growing delay.
 pub fn run(cfg: PoolConfig, shared: Arc<Shared>, jobs: Arc<Jobs>, shares: Receiver<Share>) {
     let mut delay = Duration::from_secs(1);
     while !shared.stopping() {
         if cfg.dev && !shared.fee.wanted.load(Ordering::SeqCst) {
-            // not its time: shares that came late for it are dropped
+
             while shares.try_recv().is_ok() {}
             std::thread::sleep(Duration::from_millis(100));
             delay = Duration::from_secs(1);
@@ -330,8 +315,7 @@ pub fn run(cfg: PoolConfig, shared: Arc<Shared>, jobs: Arc<Jobs>, shares: Receiv
         let mut logged_in = false;
         let result = session(&cfg, &shared, &jobs, &shares, &mut logged_in);
         if cfg.dev {
-            // the schedule ends the window when the link is not ready; the user's link puts its job back on the turn
-            // change, and when it is down nobody would: the dev job must not stay
+
             shared.fee.ready.store(false, Ordering::SeqCst);
             if jobs.current_is_dev() && !shared.pool_connected.load(Ordering::SeqCst) {
                 jobs.clear();

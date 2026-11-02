@@ -15,25 +15,21 @@ RTX 20 cards, with a slower kernel.
 client, what is sent to the pool and when, the dev fee and the wallet it goes to, the local API, the exact
 hash on the CPU and every check of a share against it, and the coin's protocol. Please audit it. If you find something wrong, tell us.
 
-**The kernels and the code that drives them are closed, for now.** The programs that run on the GPU, and on all four coins
-the host code that prepares and launches them, are in this repository as sealed static libraries, one per system
-(`crates/*/kernels/sealed`), not as source. That is where the speed comes from, and we would rather not hand it to closed,
-paid miners. This is a position for the present, not a principle. In plain terms: the miner is open, the kernel and how it
-works are not.
+**The kernels are open, from 0.1.10.** The programs that run on the GPU and the engines that prepare and launch them, for all
+four coins, are here as source: `crates/qtc-cuda/kernels` and `engine`, `crates/prl-cuda/kernels` and `engine`,
+`crates/vela-cuda/engine`, `crates/erg-cuda/engine`. Read them and audit them. They are the production code only.
 
-**What a closed engine can and cannot do.** An engine is ordinary native code inside the miner's process. It loads the NVIDIA
-driver, starts threads, allocates memory and talks to the card. It gets a job's data and gives back candidates; it is never
-given your wallet, your pool, the fee or a socket, and it has no network code (you can check its imports with `dumpbin` or
-`nm`, though imports alone cannot prove what native code does: it can load libraries by name, as it does for the driver). What you
-can audit without it is what matters for your money: the wallet and the fee (`crates/dori-miner/src/devfee.rs`), what is sent to
-the pool and when (`pool.rs`, `prl_pool.rs`, `erg_pool.rs`), and that nothing is submitted that the open CPU code has not checked.
+**What runs is in the tree too.** `crates/qtc-cuda/kernels/images` and `crates/prl-cuda/kernels/images` hold the final GPU
+images, unsealed, each with its SHA-256 in `SHA256SUMS`: the exact programs the miner loads. Some of them are the compiler's
+output from these sources with a tuning step applied afterwards (instruction order, register names, scheduling bits), so a
+build from source gives the same results but not the same bytes. Nor is the source alone enough to rebuild an image: the Quantus kernel
+is compiled with per-architecture options (the `QTC_*` switches in `mining.cu`) that are not in this tree, and some of its code only
+serves variants the release does not use. The hashes on the CPU (below) are the same either way.
 
-**We are not hiding that it is closed.** The sealing only keeps the kernels from falling out of the executable with
-a one-line command. It is not strong protection and we do not pretend it is: the miner has to open them to run them, and a
-determined reader can take native code apart. What asks you not to do that is the kernel's licence (`KERNEL-LICENSE`), not the seal. If you want to understand the kernel, you do not need to take it apart:
-talk to us ([Discord](https://discord.gg/pEpuWh7D89)). We want to contribute to a better mining community for everyone, and we answer.
+**The build does not need a CUDA Toolkit.** It links the engines as prebuilt static libraries, one per system
+(`crates/*/kernels/sealed`), built from this source and carrying these images; the sealing there is only packaging.
 
-**You can check what the kernel does without its source.** `dori-miner bench` starts by hashing 4096 nonces on
+**You can check what the kernel does.** `dori-miner bench` starts by hashing 4096 nonces on
 the card and running a search on it, and compares both with the exact hash computed on the CPU by the code in
 `crates/qtc-pow`; while mining, every share is checked on the CPU before it is sent, and `--self-check` measures the card against the CPU for as
 long as you like. On Pearl every tile the card reports is checked twice on the CPU before it is sent: by the miner's
@@ -133,6 +129,12 @@ recommend [DoriRig](https://gitlab.com/doribyte-releases/downloads) (beta), Dori
 of fans, limits and temperatures; any tool you already use works too. Either way, watch the temperatures (memory too) on the
 first run.
 
+## DoriMiner Control
+
+Optional: a small window for one miner on one computer, in `control/`. It writes the miner's command line, starts and
+stops it, and shows what it is doing. On Windows a profile can also set a card's power limit, clocks and fans, as
+administrator. It comes as its own package on the downloads page, with this same miner in it.
+
 ## Build
 
 Rust and its system linker are all you need (on Linux, libstdc++ for the Ergo and Vela engines): the engines are in the tree as
@@ -159,17 +161,17 @@ Post it in the #hashrates channel of our Discord: https://discord.gg/pEpuWh7D89
 | Path | What |
 |---|---|
 | `crates/qtc-pow` | Exact QPoW hash on the CPU |
-| `crates/qtc-cuda` | Quantus on each card: the engine as a sealed library (`kernels/sealed`), candidates checked on the CPU |
+| `crates/qtc-cuda` | Quantus on each card: the kernel and the engine in source (`kernels`, `engine`), the final images (`kernels/images`), the engine as a prebuilt library (`kernels/sealed`), candidates checked on the CPU |
 | `crates/prl-pow` | Pearl on the CPU: the exact model of the proof of work, the job and pair sides, shares checked with the official verifier |
-| `crates/prl-cuda` | Pearl on each card: the engine as a sealed library (`kernels/sealed`) |
-| `crates/erg-cuda` | Ergo on each card: the engine as a sealed library (`kernels/sealed`, with NVIDIA's static CUDA runtime), and the protocol's hashes |
-| `crates/vela-cuda` | Vela on each card: the engine as a sealed library (`kernels/sealed`, with NVIDIA's static CUDA runtime), and the protocol's hashes |
+| `crates/prl-cuda` | Pearl on each card: the kernels and the engine in source (`kernels`, `engine`), the final images (`kernels/images`), the engine as a prebuilt library (`kernels/sealed`) |
+| `crates/erg-cuda` | Ergo on each card: the engine in source (`engine`), as a prebuilt library (`kernels/sealed`, with NVIDIA's static CUDA runtime), and the protocol's hashes |
+| `crates/vela-cuda` | Vela on each card: the engine in source (`engine`), as a prebuilt library (`kernels/sealed`, with NVIDIA's static CUDA runtime), and the protocol's hashes |
 | `crates/dori-miner` | The program: pool clients, GPU workers, dev fee, local API, benchmark |
 | `third_party/pearl` | Pearl's official proof and verifier (`zk-pow`, `pearl-blake3`, `plonky2`), unchanged, with their licences |
 
 ## Credits and licence
 
-Parts of the host code, and the kernel the closed one started from, derive from
+Parts of the host code, and the Quantus kernel it started from, derive from
 [Quantus-Network/quantus-miner](https://github.com/Quantus-Network/quantus-miner) (Apache-2.0); see
 [NOTICE](NOTICE). Pearl's official proof and verifier are in `third_party/pearl`, unchanged, under their own
 licences (ISC; plonky2 MIT or Apache-2.0). `crates/vela-cuda/kernels/sealed` and `crates/erg-cuda/kernels/sealed` carry NVIDIA's static CUDA runtime
@@ -177,11 +179,12 @@ licences (ISC; plonky2 MIT or Apache-2.0). `crates/vela-cuda/kernels/sealed` and
 
 In short, and the files are what counts:
 
-- **Free to use, to read, to build and to change for yourself.** The source is under the
-  [PolyForm Noncommercial License 1.0.0](LICENSE), and [MINING-PERMISSION](MINING-PERMISSION) adds that mining
-  for your own account, at any scale and for profit, is allowed.
+- **Free to use, to read, to build and to change for yourself.** All of it, the kernels and engines included, is under the
+  [PolyForm Noncommercial License 1.0.0](LICENSE), and [MINING-PERMISSION](MINING-PERMISSION) adds that mining for your
+  own account, as a person, is allowed. Mining by or for a company needs a written agreement with us.
 - **Not for sale.** You may not sell it, put it in a paid product or service, or use its code in another
   miner that charges a fee or keeps its source closed.
-- **The kernel images and the sealed engines** are free to use with DoriMiner and may not be taken apart: [KERNEL-LICENSE](KERNEL-LICENSE).
+- **Source-available, not "open source" in the OSI sense:** the noncommercial terms are the difference. Releases before 0.1.10
+  keep the terms they were published with.
 
 Want something these terms do not allow? Talk to us.

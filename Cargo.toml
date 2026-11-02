@@ -1,13 +1,13 @@
 [workspace]
 members = ["crates/qtc-cuda", "crates/dori-miner", "crates/qtc-pow", "crates/prl-pow", "crates/prl-cuda", "crates/vela-cuda", "crates/erg-cuda"]
 default-members = ["crates/dori-miner"]
-# third-party crates built as dependencies, each with its own workspace and settings
+
 exclude = ["third_party"]
 resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.1.9"
+version = "0.1.10"
 publish = false
 license = "PolyForm-Noncommercial-1.0.0"
 

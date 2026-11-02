@@ -3,9 +3,9 @@ name = "qtc-cuda"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
-# The host code of this crate: PolyForm Noncommercial with MINING-PERMISSION. The engine it links: KERNEL-LICENSE.
-license = "PolyForm-Noncommercial-1.0.0 AND LicenseRef-DoriMiner-Kernel"
-description = "CUDA QPoW search through the sealed engine, candidates verified on the CPU"
+
+license = "PolyForm-Noncommercial-1.0.0"
+description = "CUDA QPoW search, candidates verified on the CPU"
 build = "build.rs"
 
 [dependencies]

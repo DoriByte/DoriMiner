@@ -1,12 +1,3 @@
-//! Client for the Ergo (ERG) pool dialect, as the open pools speak it (Miningcore's Blockchain/Ergo, 2026-10-28):
-//! newline-delimited JSON over TCP or TLS with array parameters. `mining.subscribe` answers
-//! `[subscriptions, extranonce1, extranonce2_size]` (the nonce is 8 bytes: extranonce1 ‖ extranonce2);
-//! `mining.notify` carries `[job_id, height, msg, "", "", version, b, "", clean]` with b the share's target in
-//! decimal (a share is valid when its hit < b); `mining.submit` sends `[worker, job_id, extranonce2, "", nonce]`.
-//! The Lithos client (the decentralised pool's local stratum, 127.0.0.1:4444) speaks the same dialect with two
-//! differences: its answers carry the request's id as text (`"id":"1"`), and it may hand a new extranonce1 in the
-//! middle of a link with `mining.set_extranonce` `[extranonce1, extranonce2_size]` (after a duplicate nonce).
-
 use crate::pool::{connect, send_line, LineReader, PoolConfig};
 use crate::state::Shared;
 use primitive_types::U256;
@@ -21,17 +12,14 @@ const SUBSCRIBE_ID: u64 = 1;
 const AUTHORIZE_ID: u64 = 2;
 const FIRST_SUBMIT_ID: u64 = 100;
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
-/// Ergo blocks are about 2 minutes apart and the pools resend the job in between; this long without a line means a
-/// dead link.
+
 const SILENCE_LIMIT: Duration = Duration::from_secs(300);
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(20);
-/// A share is answered in well under a second; this long without an answer means the link is dead even though the
-/// socket still looks open (29/10: a 1-minute network drop left the miner sending shares into it for 5 minutes).
+
 const ANSWER_DEADLINE: Duration = Duration::from_secs(30);
 const ANSWER_FORGET: Duration = Duration::from_secs(120);
 const MAX_JOB_ID: usize = 128;
 
-/// A job as the pool sends it, with the extranonce1 of its link.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct ErgJob {
     pub id: String,
@@ -44,7 +32,7 @@ pub struct ErgJob {
 }
 
 impl ErgJob {
-    /// The nonce's fixed part: extranonce1 in the top bytes, as a number (the card counts up from it).
+
     pub fn nonce_prefix(&self) -> Result<u64, String> {
         let b = unhex(&self.extranonce1)?;
         if b.len() + self.extranonce2_size != 8 {
@@ -100,7 +88,6 @@ impl Jobs {
     }
 }
 
-/// A share that meets the pool's target (checked on the CPU, exactly, from the card's candidate).
 pub struct Share {
     pub dev: bool,
     pub generation: u64,
@@ -114,7 +101,7 @@ impl Share {
     pub fn nonce_hex(&self) -> String {
         format!("{:016x}", self.nonce)
     }
-    /// The nonce's extranonce2 part, as hex.
+
     pub fn extranonce2(&self) -> String {
         self.nonce_hex()[16 - 2 * self.extranonce2_size..].to_string()
     }
@@ -133,7 +120,7 @@ pub enum Incoming {
     Job(ErgJob),
     BadJob(String),
     Subscribed { extranonce1: String, extranonce2_size: usize },
-    /// A new extranonce1 in the middle of the link (Lithos).
+
     Extranonce { extranonce1: String, extranonce2_size: usize },
     Authorized,
     Refused(String),
@@ -151,26 +138,21 @@ fn error_text(error: &Value) -> String {
     }
 }
 
-/// A rejection that only says the job is gone.
 fn is_stale(text: &str) -> bool {
     let t = text.to_ascii_lowercase();
-    // the Lithos client says "21: solution was for old block" for a share found as the job changed
+
     t.contains("stale") || t.contains("job not found") || t.contains("unknown job") || t.contains("old block")
 }
 
-/// A number the pool may send as a JSON number or as text.
 fn as_u64(v: &Value) -> Option<u64> {
     v.as_u64().or_else(|| v.as_str().and_then(|s| s.trim().parse().ok()))
 }
 
-/// An extranonce1 and the size of extranonce2, when they make the 8 bytes of an Ergo nonce.
 fn extranonce(en1: Option<&Value>, size: Option<&Value>) -> Option<(String, usize)> {
     let (e, s) = (en1?.as_str()?, as_u64(size?)? as usize);
     (unhex(e).is_ok() && e.len() / 2 + s == 8).then(|| (e.to_ascii_lowercase(), s))
 }
 
-/// The target b: decimal text (Miningcore), or a JSON number (exact up to 2^53; above that the last digits are the
-/// float's, which only moves the target by a part in 10^15).
 fn as_target(v: &Value) -> Result<U256, String> {
     match v {
         Value::String(s) => erg_cuda::target_from_decimal(s),
@@ -231,7 +213,7 @@ pub fn parse_incoming(line: &str) -> Result<Incoming, String> {
     let error = v.get("error").cloned().unwrap_or(Value::Null);
     let result = v.get("result").cloned().unwrap_or(Value::Null);
     let ok = !result.is_null() && result != Value::Bool(false) && error.is_null();
-    // the id as a number, or as text (the Lithos client answers "id":"1")
+
     match v.get("id").and_then(as_u64) {
         Some(SUBSCRIBE_ID) => {
             Ok(match extranonce(result.get(1), result.get(2)) {
@@ -318,7 +300,7 @@ fn session(cfg: &PoolConfig, shared: &Shared, jobs: &Jobs, shares: &Receiver<Sha
                 Ok(Incoming::Extranonce { extranonce1, extranonce2_size }) => {
                     log::info!(target: crate::ui::DETAIL, "{}new extranonce1 {extranonce1} from the pool", if dev { "dev fee " } else { "" });
                     extranonce = Some((extranonce1.clone(), extranonce2_size));
-                    // the cards move to the new nonce space at once; shares of the old one are dropped as before a login
+
                     if let Some(job) = latest.as_mut() {
                         job.extranonce1 = extranonce1;
                         job.extranonce2_size = extranonce2_size;
@@ -396,8 +378,7 @@ fn session(cfg: &PoolConfig, shared: &Shared, jobs: &Jobs, shares: &Receiver<Sha
                 pending.insert(id, Instant::now());
             }
         }
-        // dead link: a share unanswered for ANSWER_DEADLINE and nothing at all from the pool in that time (a pool that
-        // is alive but leaves a submit unanswered keeps the link; its entry goes after ANSWER_FORGET)
+
         if last_line.elapsed() > ANSWER_DEADLINE && pending.values().any(|sent| sent.elapsed() > ANSWER_DEADLINE) {
             return Err(format!("no answer to a share in {} seconds", ANSWER_DEADLINE.as_secs()));
         }
@@ -408,7 +389,6 @@ fn session(cfg: &PoolConfig, shared: &Shared, jobs: &Jobs, shares: &Receiver<Sha
     }
 }
 
-/// Keeps the pool connection up until a stop is requested, reconnecting with a growing delay.
 pub fn run(cfg: PoolConfig, shared: Arc<Shared>, jobs: Arc<Jobs>, shares: Receiver<Share>) {
     let mut delay = Duration::from_secs(1);
     while !shared.stopping() {
@@ -476,7 +456,7 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
-        // the height as text and the target as a JSON number also read
+
         let n2 = r#"{"method":"mining.notify","params":[7,"614400","548c3e602a8f36f8f2738f5f643b02425038044d98543a51cabaa9785e7e864f","","",2,123456789,"",false]}"#;
         assert!(matches!(parse_incoming(n2).unwrap(), Incoming::Job(j) if j.id == "7" && j.height == 614_400 && j.target == U256::from(123_456_789u64)));
         let bad = notify.replace("\"7067388259113537318333190002971674063283542741642755394446115914399301849\"", "\"\"");
@@ -492,8 +472,6 @@ mod tests {
         assert_eq!(parse_incoming(r#"{"id":null,"method":"mining.set_difficulty","params":[1]}"#).unwrap(), Incoming::Difficulty(1.0));
     }
 
-    /// The lines of the Lithos client 1.0.6 (JStratum: the id comes back as text; `Response.subscribe`,
-    /// `Announcement.extraNonce1`, `BlockTemplate.buildJobParams` with the version in hex and b in decimal).
     #[test]
     fn reads_what_lithos_sends() {
         assert_eq!(

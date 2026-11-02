@@ -1,12 +1,15 @@
 DoriMiner - additional permission from the licensor
 
-The source code of DoriMiner is licensed under the PolyForm Noncommercial License 1.0.0 (see LICENSE).
-On top of what that licence allows, J. Costa (DoriByte), the licensor, grants everyone the following.
+The source code of DoriMiner, its GPU kernels and engines included, is licensed under the PolyForm
+Noncommercial License 1.0.0 (see LICENSE). On top of what that licence allows, J. Costa (DoriByte), the
+licensor, grants every natural person the following.
 
 1. Mining for yourself is a permitted purpose.
    Running DoriMiner, as published by DoriByte or as built by you from this source, to mine for your own
-   account or for the account of the company you work for, on hardware you own or rent, at any scale and for
-   profit, is a permitted purpose under the licence.
+   account, as a natural person, on hardware you own or rent, is a permitted purpose under the licence, even
+   though you may earn from it.
+   This permission is not given to companies or other organisations, nor to anyone mining on their behalf
+   or on their hardware: that needs a written agreement with DoriByte.
 
 2. What stays outside the permitted purposes. You may not, without a written agreement with DoriByte:
    a. sell, rent or sublicense the software, or offer it as part of a paid product or paid service;
@@ -17,8 +20,8 @@ On top of what that licence allows, J. Costa (DoriByte), the licensor, grants ev
 
 3. Turning the dev fee off with the documented option (--dev-fee 0) is allowed and always will be.
 
-4. The kernel images (the crates/*/kernels/sealed folders, for every coin, and the copies inside the executables) are not source
-   code and are not covered by the PolyForm licence: their terms are in KERNEL-LICENSE.
+4. The kernels, their source and the images built from it (and the copies inside the executables) are covered
+   by these same terms, from version 0.1.10 on. Earlier versions keep the terms they were published with.
 
 If you want to do something these terms do not allow, talk to us. We would rather agree than refuse.
 

@@ -1,8 +1,3 @@
-//! Client for the Vela (VELA) pool dialect (Suprnova, 2026-10-24): newline-delimited JSON over TCP or TLS with object
-//! parameters. `mining.subscribe` answers the extranonce1; `mining.notify` carries a Bitcoin-style job (coinbase halves,
-//! merkle branch, version, bits, ntime) plus the model's hash and the prompt's tokens; `mining.submit` sends the
-//! extranonce2, the nonce, the whole x0 (hex) and hashPoI. Mined with the prototype on 2026-10-24: 5 of 5 accepted.
-
 use crate::pool::{connect, send_line, LineReader, PoolConfig};
 use crate::state::Shared;
 use serde_json::{json, Value};
@@ -16,13 +11,12 @@ const SUBSCRIBE_ID: u64 = 1;
 const AUTHORIZE_ID: u64 = 2;
 const FIRST_SUBMIT_ID: u64 = 100;
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
-/// Vela blocks are 5 minutes apart and the pool pings in between; this long without a line means a dead link.
+
 const SILENCE_LIMIT: Duration = Duration::from_secs(360);
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(20);
 const ANSWER_LIMIT: Duration = Duration::from_secs(120);
 const MAX_JOB_ID: usize = 128;
 
-/// A job as the pool sends it, with the difficulty and extranonce1 of its link.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct VelaJob {
     pub id: String,
@@ -50,8 +44,7 @@ fn unhex(h: &str) -> Result<Vec<u8>, String> {
 }
 
 impl VelaJob {
-    /// The 76 bytes of the header before the nonce, for a given extranonce2 (hex): version, previous hash (reversed),
-    /// merkle root, ntime, bits, all little-endian as in Bitcoin.
+
     pub fn header76(&self, extranonce2: &str) -> Result<[u8; 76], String> {
         let mut cb = unhex(&self.coinbase1)?;
         cb.extend(unhex(&self.extranonce1)?);
@@ -122,7 +115,6 @@ impl Jobs {
     }
 }
 
-/// A share that meets the pool's target (checked on the CPU from the card's x0).
 pub struct Share {
     pub dev: bool,
     pub generation: u64,
@@ -162,7 +154,6 @@ fn error_text(error: &Value) -> String {
     }
 }
 
-/// A rejection that only says the job is gone.
 fn is_stale(text: &str) -> bool {
     let t = text.to_ascii_lowercase();
     t.contains("stale") || t.contains("job not found") || t.contains("unknown job")
@@ -384,7 +375,6 @@ fn session(cfg: &PoolConfig, shared: &Shared, jobs: &Jobs, shares: &Receiver<Sha
     }
 }
 
-/// Keeps the pool connection up until a stop is requested, reconnecting with a growing delay.
 pub fn run(cfg: PoolConfig, shared: Arc<Shared>, jobs: Arc<Jobs>, shares: Receiver<Share>) {
     let mut delay = Duration::from_secs(1);
     while !shared.stopping() {

@@ -1,14 +1,9 @@
-//! Card sensors read through NVML, the management library the NVIDIA driver
-//! installs (nvml.dll on Windows, libnvidia-ml.so.1 on Linux), loaded at run
-//! time: without it the miner runs the same and only shows no temperatures.
-//! Read only: nothing here changes a clock, a limit or a fan.
-
 use std::ffi::{c_char, c_int, c_uint, c_void, CString};
 
 type Device = *mut c_void;
 const SUCCESS: c_int = 0;
 const TEMPERATURE_GPU: c_uint = 0;
-/// NVML_FI_DEV_MEMORY_TEMP: most GeForce cards answer "not supported".
+
 const FIELD_MEMORY_TEMP: c_uint = 82;
 
 #[repr(C)]
@@ -22,7 +17,6 @@ struct FieldValue {
     value: u64,
 }
 
-/// What one card reads now; a field the card does not report is `None`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Reading {
     pub core_c: Option<u32>,
@@ -41,17 +35,14 @@ pub struct Nvml {
     fields: unsafe extern "C" fn(Device, c_int, *mut FieldValue) -> c_int,
 }
 
-// SAFETY: NVML is documented as thread safe; the handles are plain pointers it owns.
 unsafe impl Send for Nvml {}
 unsafe impl Sync for Nvml {}
 
 impl Nvml {
-    /// The driver's NVML, initialised; `None` if it is not there.
+
     pub fn open() -> Option<Self> {
         let name = if cfg!(windows) { "nvml.dll" } else { "libnvidia-ml.so.1" };
-        // SAFETY: the driver's own library, loaded by name from the system folders
-        // (on Windows the search is limited to System32 before this runs), and
-        // symbols with the signatures of the NVML headers.
+
         unsafe {
             let lib = libloading::Library::new(name).ok()?;
             let init: libloading::Symbol<unsafe extern "C" fn() -> c_int> = lib.get(b"nvmlInit_v2\0").ok()?;
@@ -73,7 +64,7 @@ impl Nvml {
 
     fn device(&self, pci_bus_id: Option<&str>, ordinal: usize) -> Option<Device> {
         let mut device: Device = std::ptr::null_mut();
-        // SAFETY: NVML calls with a valid out pointer and a NUL-terminated string.
+
         unsafe {
             if let Some(pci) = pci_bus_id.and_then(|p| CString::new(p).ok()) {
                 if (self.by_pci)(pci.as_ptr(), &mut device) == SUCCESS {
@@ -84,14 +75,13 @@ impl Nvml {
         }
     }
 
-    /// The card at this PCI address (or, failing that, this nvidia-smi index).
     pub fn read(&self, pci_bus_id: Option<&str>, ordinal: usize) -> Reading {
         let Some(device) = self.device(pci_bus_id, ordinal) else {
             return Reading::default();
         };
         let mut out = Reading::default();
         let mut value: c_uint = 0;
-        // SAFETY: NVML calls on a handle it gave, with valid out pointers.
+
         unsafe {
             if (self.temperature)(device, TEMPERATURE_GPU, &mut value) == SUCCESS {
                 out.core_c = Some(value);
@@ -104,7 +94,7 @@ impl Nvml {
             }
             let mut field = FieldValue { field_id: FIELD_MEMORY_TEMP, scope_id: 0, timestamp: 0, latency_usec: 0, value_type: 0, status: -1, value: 0 };
             if (self.fields)(device, 1, &mut field) == SUCCESS && field.status == SUCCESS {
-                // unsigned int, unsigned long, unsigned long long or signed int: the low bits
+
                 if matches!(field.value_type, 1 | 2 | 3 | 5) && (field.value as u32) < 200 {
                     out.memory_c = Some(field.value as u32);
                 }

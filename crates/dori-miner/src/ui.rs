@@ -1,21 +1,13 @@
-//! What the miner shows in its own console window: the banner, the header, the
-//! log lines with colour and local time, the report every 30 s and the window
-//! title. Only when the output is a console a person reads: under a manager
-//! (output piped), with NO_COLOR set or TERM=dumb, every line stays the plain
-//! "[time LEVEL] message" it always was. Managers read the miner by its API.
-
 use crate::sensors::Reading;
 use std::io::{IsTerminal, Write};
 use std::sync::OnceLock;
 
-/// Log target for the lines that matter to the person mining (shown in green).
 pub const GOOD: &str = "good";
-/// Log target for the technical lines (shown dimmed).
+
 pub const DETAIL: &str = "detail";
-/// Log target for each new job: a pool may send one every 2 s, so a console leaves them out.
+
 pub const JOB: &str = "job";
 
-/// Core and memory temperatures from which the report warns.
 const CORE_WARN_C: u32 = 80;
 const CORE_HOT_C: u32 = 87;
 const MEMORY_WARN_C: u32 = 90;
@@ -31,7 +23,6 @@ pub fn fancy() -> bool {
     })
 }
 
-/// Windows consoles show escape sequences only once asked to.
 #[cfg(windows)]
 fn enable_colours() -> bool {
     const STD_OUTPUT_HANDLE: u32 = -11i32 as u32;
@@ -42,7 +33,7 @@ fn enable_colours() -> bool {
         fn GetConsoleMode(handle: *mut std::ffi::c_void, mode: *mut u32) -> i32;
         fn SetConsoleMode(handle: *mut std::ffi::c_void, mode: u32) -> i32;
     }
-    // SAFETY: plain calls of the console API on this process's own output.
+
     unsafe {
         let handle = GetStdHandle(STD_OUTPUT_HANDLE);
         let mut mode = 0;
@@ -68,7 +59,6 @@ pub fn dim(text: &str) -> String { paint("2", text) }
 pub fn bold(text: &str) -> String { paint("1", text) }
 pub fn cyan(text: &str) -> String { paint("36", text) }
 
-/// Local time as HH:MM:SS.
 fn local_time() -> String {
     #[cfg(windows)]
     {
@@ -79,7 +69,7 @@ fn local_time() -> String {
             fn GetLocalTime(time: *mut SystemTime);
         }
         let mut t = SystemTime { year: 0, month: 0, weekday: 0, day: 0, hour: 0, minute: 0, second: 0, millis: 0 };
-        // SAFETY: fills the struct it is given.
+
         unsafe { GetLocalTime(&mut t) };
         format!("{:02}:{:02}:{:02}", t.hour, t.minute, t.second)
     }
@@ -92,7 +82,7 @@ fn local_time() -> String {
             fn localtime_r(t: *const i64, out: *mut Tm) -> *mut Tm;
         }
         let mut tm = Tm { sec: 0, min: 0, hour: 0, mday: 0, mon: 0, year: 0, wday: 0, yday: 0, isdst: 0, gmtoff: 0, zone: std::ptr::null() };
-        // SAFETY: the C library's own time functions, with valid pointers.
+
         unsafe {
             let now = time(std::ptr::null_mut());
             localtime_r(&now, &mut tm);
@@ -101,8 +91,6 @@ fn local_time() -> String {
     }
 }
 
-/// One log line. Plain: the format the miner always had. In a console: local
-/// time, and the message coloured by what it is.
 pub fn log_line(out: &mut impl Write, timestamp: impl std::fmt::Display, level: log::Level, target: &str, message: &str) -> std::io::Result<()> {
     if !fancy() {
         return writeln!(out, "[{} {:<5}] {}", timestamp, level, message);
@@ -115,7 +103,7 @@ pub fn log_line(out: &mut impl Write, timestamp: impl std::fmt::Display, level: 
         (log::Level::Warn, _) => yellow(&format!("⚠ {message}")),
         (_, GOOD) => green(&format!("✓ {message}")),
         (_, DETAIL) => dim(message),
-        // the engine's own lines (kernel loaded, registers): technical
+
         (_, t) if t.starts_with("qtc_cuda") => dim(message),
         _ => message.to_string(),
     };
@@ -131,7 +119,6 @@ const BANNER: [&str; 6] = [
     "╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝",
 ];
 
-/// The wallet as the header shows it: the start and the end, enough to recognise it.
 pub fn short_wallet(wallet: &str) -> String {
     let chars: Vec<char> = wallet.chars().collect();
     if chars.len() <= 16 {
@@ -151,11 +138,10 @@ pub struct Header<'a> {
     pub gpus: Vec<String>,
 }
 
-/// The big name and the header, once at start. Only in a console.
 pub fn print_start(h: &Header) {
     let mut out = std::io::stdout().lock();
     let _ = writeln!(out);
-    // a gradient from cyan to blue, one colour a line
+
     let colours = [(0, 214, 255), (0, 190, 255), (20, 165, 255), (40, 140, 255), (60, 115, 255), (80, 95, 240)];
     for (line, (r, g, b)) in BANNER.iter().zip(colours) {
         let _ = writeln!(out, "  \x1b[1;38;2;{r};{g};{b}m{line}\x1b[0m");
@@ -190,11 +176,10 @@ pub fn print_start(h: &Header) {
     let _ = writeln!(out);
 }
 
-/// The window's title (the taskbar shows it). Only in a console.
 pub fn set_title(title: &str) {
     if fancy() {
         let mut out = std::io::stdout().lock();
-        // no newline follows, so the line buffer has to be flushed for the title to change now
+
         let _ = write!(out, "\x1b]0;{title}\x07");
         let _ = out.flush();
     }
@@ -221,7 +206,6 @@ pub struct GpuLine {
     pub sensors: Reading,
 }
 
-/// The report every 30 s, in a console: totals, then a line a card.
 pub fn print_report(t: &Totals, gpus: &[GpuLine]) {
     let count = |n: u64, paint: fn(&str) -> String| if n > 0 { paint(&n.to_string()) } else { n.to_string() };
     let mut lines = vec![format!(

@@ -1,5 +1,3 @@
-//! State shared by the pool client, the GPU workers and the local API.
-
 use primitive_types::U512;
 use qtc_cuda::DeviceInfo;
 use std::collections::VecDeque;
@@ -7,10 +5,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-/// What the hash rate is averaged over.
 const RATE_WINDOW: Duration = Duration::from_secs(10);
 
-/// The work every GPU is on. A new `generation` means drop the old search.
 #[derive(Clone, Debug)]
 pub struct Work {
     pub generation: u64,
@@ -19,22 +15,20 @@ pub struct Work {
     pub difficulty: U512,
     pub target: U512,
     pub extranonce: Vec<u8>,
-    /// A job of the dev fee link: its shares go there.
+
     pub dev: bool,
 }
 
-/// A nonce a GPU found and the CPU confirmed, on its way to the pool.
 #[derive(Clone, Debug)]
 pub struct Share {
     pub generation: u64,
     pub job_id: String,
     pub nonce_be: [u8; 64],
     pub hash: U512,
-    /// Found for a job of the dev fee link.
+
     pub dev: bool,
 }
 
-/// Hashes over the trailing window, from the batches that completed in it.
 #[derive(Default)]
 pub struct RateWindow {
     batches: VecDeque<(Instant, u64)>,
@@ -42,7 +36,7 @@ pub struct RateWindow {
 }
 
 impl RateWindow {
-    /// `started` is when the batch was launched, `now` when it completed.
+
     pub fn record(&mut self, started: Instant, now: Instant, hashes: u64) {
         self.first.get_or_insert(started);
         self.batches.push_back((now, hashes));
@@ -74,14 +68,11 @@ impl RateWindow {
     }
 }
 
-/// What a self-check (`worker::SelfCheck`) has counted on a card.
 #[derive(Default)]
 pub struct CheckStats {
-    /// Nonces the card reported below the check's target that the CPU hash
-    /// confirmed. The ones it did not confirm are `false_candidates`.
+
     pub hits: AtomicU64,
-    /// Nonces of the launches the CPU hashed again in full, the valid ones
-    /// among them, and the valid ones the card had not reported.
+
     pub cpu_hashes: AtomicU64,
     pub cpu_hits: AtomicU64,
     pub cpu_missed: AtomicU64,
@@ -91,17 +82,15 @@ pub struct GpuStats {
     pub info: DeviceInfo,
     pub hashes: AtomicU64,
     pub launches: AtomicU64,
-    /// Hashes of launches that ended after their job had been replaced.
+
     pub stale_hashes: AtomicU64,
     pub false_candidates: AtomicU64,
-    /// Candidates beyond what a launch records: with a share target, none.
+
     pub dropped_candidates: AtomicU64,
-    /// Set while the device is down: it failed and is waiting to be opened
-    /// again, or its thread crashed. The API shows it.
+
     pub failed: AtomicBool,
     pub check: CheckStats,
-    /// What the card's user should know about how it mines, as codes the managers translate (`GET /summary`, `notices`):
-    /// "erg_compact_table" (Ergo: the whole table does not fit on the card, and it mines slower for it).
+
     pub notices: Mutex<Vec<&'static str>>,
     window: Mutex<RateWindow>,
 }
@@ -135,7 +124,6 @@ impl GpuStats {
         self.window.lock().unwrap().rate(Instant::now())
     }
 
-    /// Adds or removes a notice code.
     pub fn set_notice(&self, code: &'static str, on: bool) {
         let mut n = self.notices.lock().unwrap();
         n.retain(|c| *c != code);
@@ -145,55 +133,49 @@ impl GpuStats {
     }
 }
 
-/// The optional dev fee: now and then the GPUs mine for the DoriByte wallet for a minute. The schedule
-/// (`devfee.rs`) sets `wanted` and `active`, the second pool link sets `ready` and counts its shares.
 #[derive(Default)]
 pub struct Fee {
-    /// Percent of the time, 0 when off. Set once, before the threads start.
+
     pub percent: AtomicU64,
-    /// The dev fee link should be connected.
+
     pub wanted: AtomicBool,
-    /// The dev fee link is logged in and holds a job.
+
     pub ready: AtomicBool,
-    /// The GPUs are on the dev fee link's jobs.
+
     pub active: AtomicBool,
     pub accepted: AtomicU64,
     pub rejected: AtomicU64,
     pub stale: AtomicU64,
-    /// Whole seconds mined for the dev fee so far.
+
     pub seconds: AtomicU64,
 }
 
 pub struct Shared {
     work: Mutex<Option<Arc<Work>>>,
-    /// Signalled whenever the generation changes.
+
     changed: Condvar,
     generation: AtomicU64,
     stop: AtomicBool,
-    /// Set by a GPU thread that cannot open its card again after a failure: the driver keeps a kernel's fault
-    /// (CUDA_ERROR_ILLEGAL_ADDRESS and the like) for the whole process, and only a new process clears it.
+
     pub needs_new_process: AtomicBool,
-    /// What is mined: "quantus" or "pearl" (the API's `algo`).
+
     pub algo: &'static str,
     pub started: Instant,
     pub pool_url: String,
     pub pool_connected: AtomicBool,
     pub accepted: AtomicU64,
     pub rejected: AtomicU64,
-    /// Shares the pool called stale, plus the ones dropped before sending
-    /// because the job had already changed.
+
     pub stale: AtomicU64,
-    /// Shares sent although their job had changed (`--submit-late`), and how
-    /// many of those the pool accepted.
+
     pub late_sent: AtomicU64,
     pub late_accepted: AtomicU64,
     pub fee: Fee,
     pub gpus: Vec<GpuStats>,
-    /// A model the coin needs before mining (Vela): where its download stands. None for the other coins.
+
     pub model: Mutex<Option<ModelState>>,
 }
 
-/// The model file's state, as `GET /summary` gives it (`model`): "downloading", "verifying", "ready" or "error".
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModelState {
     pub state: &'static str,
@@ -234,9 +216,6 @@ impl Shared {
         self.changed.notify_all();
     }
 
-    /// Sleeps until the generation is no longer `seen`, a stop is requested
-    /// or `timeout` passes, and returns the generation. A change wakes the
-    /// caller at once: it does not wait for a timer.
     pub fn wait_for_generation(&self, seen: u64, timeout: Duration) -> u64 {
         let guard = self.work.lock().unwrap();
         let _unused = self
@@ -252,8 +231,6 @@ impl Shared {
         self.stop.load(Ordering::SeqCst)
     }
 
-    /// The generation the GPUs should be working on. Changes on every new job
-    /// and when work is withdrawn.
     pub fn generation(&self) -> u64 {
         self.generation.load(Ordering::SeqCst)
     }
@@ -262,7 +239,6 @@ impl Shared {
         self.work.lock().unwrap().clone()
     }
 
-    /// Replaces the current work and returns its generation.
     pub fn set_work(
         &self,
         job_id: String,
@@ -274,7 +250,6 @@ impl Shared {
         self.set_work_of(false, job_id, header, difficulty, target, extranonce)
     }
 
-    /// The same, saying which link the job came from.
     pub fn set_work_of(
         &self,
         dev: bool,
@@ -299,7 +274,6 @@ impl Shared {
         generation
     }
 
-    /// Stops the GPUs until the next job (pool connection lost).
     pub fn clear_work(&self) {
         let mut slot = self.work.lock().unwrap();
         self.generation.fetch_add(1, Ordering::SeqCst);
@@ -323,13 +297,11 @@ mod tests {
         let mut window = RateWindow::default();
         assert_eq!(window.rate(t0), 0.0);
 
-        // Ten 1-second batches of 600 hashes each.
         for i in 0..10 {
             window.record(at(i * 1000), at((i + 1) * 1000), 600);
         }
         assert_eq!(window.rate(at(10_000)), 600.0);
 
-        // Early on, the span is the time since the first launch, not the full window.
         let mut early = RateWindow::default();
         early.record(at(0), at(2000), 1000);
         assert_eq!(early.rate(at(2000)), 500.0);
@@ -348,11 +320,11 @@ mod tests {
     #[test]
     fn a_job_change_wakes_a_waiter_at_once() {
         let shared = Arc::new(Shared::new("pool".into(), Vec::new()));
-        // Nothing changes: the wait runs out.
+
         let start = Instant::now();
         assert_eq!(shared.wait_for_generation(0, Duration::from_millis(30)), 0);
         assert!(start.elapsed() >= Duration::from_millis(25));
-        // Already changed: no wait at all.
+
         shared.set_work("a".into(), [0; 32], U512::one(), U512::MAX, vec![]);
         assert_eq!(shared.wait_for_generation(0, Duration::from_secs(5)), 1);
 
@@ -370,7 +342,6 @@ mod tests {
         assert_eq!(generation, 2);
         assert!(woke.duration_since(changed) < Duration::from_secs(2));
 
-        // A stop ends the wait too.
         let waiter = {
             let shared = shared.clone();
             std::thread::spawn(move || shared.wait_for_generation(2, Duration::from_secs(20)))
